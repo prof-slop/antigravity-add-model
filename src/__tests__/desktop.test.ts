@@ -10,6 +10,10 @@ const compiled = ts.transpileModule(readFileSync('src/desktop.ts', 'utf8'), {
 async function fixture(proxyPort = 50999, lsPort = 54321) {
   const events = new Map<string, (...args: unknown[]) => void>();
   let intercept: (details: { url: string }, callback: ReturnType<typeof vi.fn>) => void;
+  let headersIntercept: (
+    details: { responseHeaders?: Record<string, string[]> },
+    callback: (res: { responseHeaders?: Record<string, string[]> }) => void,
+  ) => void;
   const register = vi.fn();
   const stop = vi.fn().mockResolvedValue(undefined);
   const setLanguageServerPortResolver = vi.fn();
@@ -18,7 +22,14 @@ async function fixture(proxyPort = 50999, lsPort = 54321) {
   const dependencies = {
     electron: {
       app: { whenReady: () => Promise.resolve(), on: (name, fn) => events.set(name, fn) },
-      session: { defaultSession: { webRequest: { onBeforeRequest: (fn) => (intercept = fn) } } },
+      session: {
+        defaultSession: {
+          webRequest: {
+            onBeforeRequest: (fn) => (intercept = fn),
+            onHeadersReceived: (fn) => (headersIntercept = fn),
+          },
+        },
+      },
       dialog: { showErrorBox },
     },
     './customIpc': { registerCustomModelHandlers: register },
@@ -37,6 +48,12 @@ async function fixture(proxyPort = 50999, lsPort = 54321) {
     request(url: string) {
       const callback = vi.fn();
       intercept!({ url }, callback);
+      expect(callback).toHaveBeenCalledTimes(1);
+      return callback.mock.calls[0][0];
+    },
+    receiveHeaders(responseHeaders?: Record<string, string[]>) {
+      const callback = vi.fn();
+      headersIntercept!({ responseHeaders }, callback);
       expect(callback).toHaveBeenCalledTimes(1);
       return callback.mock.calls[0][0];
     },
@@ -82,6 +99,34 @@ describe('additive desktop integration', () => {
     const f = await fixture();
     f.events.get('will-quit')!();
     expect(f.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('strips content-security-policy and x-frame-options headers on received responses', async () => {
+    const f = await fixture();
+    const result = f.receiveHeaders({
+      'content-security-policy': ["default-src 'none'"],
+      'content-security-policy-report-only': ["default-src 'none'"],
+      'x-frame-options': ['DENY'],
+      'content-type': ['text/html'],
+    });
+    expect(result).toEqual({
+      responseHeaders: {
+        'content-type': ['text/html'],
+      },
+    });
+  });
+
+  it('preserves headers when no CSP or frame-options headers are present', async () => {
+    const f = await fixture();
+    const headers = { 'content-type': ['text/html'], 'cache-control': ['no-cache'] };
+    const result = f.receiveHeaders(headers);
+    expect(result).toEqual({ responseHeaders: headers });
+  });
+
+  it('handles undefined responseHeaders gracefully', async () => {
+    const f = await fixture();
+    const result = f.receiveHeaders(undefined);
+    expect(result).toEqual({ responseHeaders: undefined });
   });
 
   it('reports document load failures while ignoring subframes and canceled navigation', async () => {

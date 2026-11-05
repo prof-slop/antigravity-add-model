@@ -264,7 +264,10 @@ export function planRuntimePatch(readVendorFile, readBuildFile) {
       'dist/preload.js',
       patchPreload(
         readInput(readVendorFile, 'dist/preload.js'),
-        ['customPreload.js', 'contextUsagePreload.js'].map((name) => ({ name, bytes: readInput(readBuildFile, name) })),
+        ['customPreload.js', 'contextUsagePreload.js', 'cspPreload.js'].map((name) => ({
+          name,
+          bytes: readInput(readBuildFile, name),
+        })),
       ),
     ],
   ]);

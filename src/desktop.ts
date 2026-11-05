@@ -14,6 +14,24 @@ export function install(getLanguageServerPort: () => number): void {
   // Registered before the vendor's ready callback, without replacing its startup,
   // updater, WSL integration, certificate policy, or window configuration.
   void app.whenReady().then(() => {
+    // Strip restrictive Content-Security-Policy and X-Frame-Options on web responses
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      if (
+        details.responseHeaders &&
+        (details.responseHeaders['content-security-policy'] ||
+          details.responseHeaders['content-security-policy-report-only'] ||
+          details.responseHeaders['x-frame-options'])
+      ) {
+        const responseHeaders = { ...details.responseHeaders };
+        delete responseHeaders['content-security-policy'];
+        delete responseHeaders['content-security-policy-report-only'];
+        delete responseHeaders['x-frame-options'];
+        callback({ responseHeaders });
+      } else {
+        callback({ responseHeaders: details.responseHeaders });
+      }
+    });
+
     session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
       const proxyPort = getProxyPort();
       const lsPort = getLanguageServerPort();

@@ -43,7 +43,12 @@ const storageAPI = { getCustomModels: () => electron_1.ipcRenderer.invoke('model
 window.addEventListener('DOMContentLoaded', () => storageAPI.getCustomModels());
 `;
 
-function fixture(overrides: Record<string, string> = {}, build = customPreload, contextBuild = '// context preload fixture') {
+function fixture(
+  overrides: Record<string, string> = {},
+  build = customPreload,
+  contextBuild = '// context preload fixture',
+  cspBuild = '// csp preload fixture',
+) {
   const files: Record<string, string> = {
     'dist/main.js': vendorMain,
     'dist/languageServer.js': vendorServer,
@@ -52,8 +57,10 @@ function fixture(overrides: Record<string, string> = {}, build = customPreload, 
   };
   const readVendor = vi.fn((name: string) => Buffer.from(files[name]));
   const readBuild = vi.fn((name: string) => {
-    expect(['customPreload.js', 'contextUsagePreload.js']).toContain(name);
-    return Buffer.from(name === 'customPreload.js' ? build : contextBuild);
+    expect(['customPreload.js', 'contextUsagePreload.js', 'cspPreload.js']).toContain(name);
+    if (name === 'customPreload.js') return Buffer.from(build);
+    if (name === 'contextUsagePreload.js') return Buffer.from(contextBuild);
+    return Buffer.from(cspBuild);
   });
   const plan = () => planRuntimePatch(readVendor, readBuild) as Map<string, Buffer>;
   return { files, readVendor, readBuild, plan };
@@ -233,6 +240,21 @@ describe('vendor runtime adapter', () => {
     });
     expect(calls).toContain('storage:get-chat-context-usage');
     expect(exposed).toEqual(['nativeStorage', 'wsl', 'futureBridge']);
+  });
+
+  it('loads the csp preload in its own scope without replacing vendor APIs', () => {
+    const executed: string[] = [];
+    const csp = `const electron_1 = require('electron'); electron_1.webFrame.executeJavaScript('console.log(1)');`;
+    const source = fixture({}, customPreload, '// context', csp).plan().get('dist/preload.js')!.toString();
+    runInNewContext(source, {
+      require: () => ({
+        ipcRenderer: { invoke: () => {} },
+        contextBridge: { exposeInMainWorld: () => {} },
+        webFrame: { executeJavaScript: (code: string) => executed.push(code) },
+      }),
+      window: { addEventListener: () => {} },
+    });
+    expect(executed).toContain('console.log(1)');
   });
 
   it.each([

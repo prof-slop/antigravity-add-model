@@ -18,3 +18,8 @@ scratch/
 dist/__mocks__/
 dist/*.test.js
 dist/**/*.test.js
+
+# Local documentation / notes
+docs/CSP_INVARIANTS.md
+docs/INTEGRATION_PLAN.md
+

@@ -15,6 +15,22 @@ function install(getLanguageServerPort) {
     // Registered before the vendor's ready callback, without replacing its startup,
     // updater, WSL integration, certificate policy, or window configuration.
     void electron_1.app.whenReady().then(() => {
+        // Strip restrictive Content-Security-Policy and X-Frame-Options on web responses
+        electron_1.session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+            if (details.responseHeaders &&
+                (details.responseHeaders['content-security-policy'] ||
+                    details.responseHeaders['content-security-policy-report-only'] ||
+                    details.responseHeaders['x-frame-options'])) {
+                const responseHeaders = { ...details.responseHeaders };
+                delete responseHeaders['content-security-policy'];
+                delete responseHeaders['content-security-policy-report-only'];
+                delete responseHeaders['x-frame-options'];
+                callback({ responseHeaders });
+            }
+            else {
+                callback({ responseHeaders: details.responseHeaders });
+            }
+        });
         electron_1.session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
             const proxyPort = (0, proxy_1.getProxyPort)();
             const lsPort = getLanguageServerPort();

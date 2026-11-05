@@ -20,6 +20,7 @@ export const REQUIRED_BUILD_FILES = [
   'desktop.js',
   'customPreload.js',
   'contextUsagePreload.js',
+  'cspPreload.js',
   'customIpc.js',
   'modelStore.js',
   'modelManagement.js',
@@ -592,6 +593,23 @@ export async function deploy(options = {}, operations = {}) {
     replacements.push({ target: path.join(meta, 'state.json'), candidate: nextState ? stateCandidate : null });
     swapTransaction(resources, staging, replacements, operations.rename);
     asar.uncache(files.archive);
+    if (process.platform === 'darwin') {
+      try {
+        let appPath = '/Applications/Antigravity.app';
+        const appIndex = resources.indexOf('.app');
+        if (appIndex !== -1) {
+          const candidate = resources.slice(0, appIndex + 4);
+          if (exists(candidate)) appPath = candidate;
+        }
+        if (exists(appPath) && (resources.includes('.app') || resources.includes('/Applications/'))) {
+          const { execSync } = await import('node:child_process');
+          execSync(`codesign --force --deep --sign - ${JSON.stringify(appPath)}`, { stdio: 'ignore' });
+          console.log(`[deploy] Re-signed ${appPath} with ad-hoc signature.`);
+        }
+      } catch (err) {
+        console.warn('[deploy] Notice: codesign failed or skipped:', err?.message || String(err));
+      }
+    }
     return {
       action: options.restore ? 'restore' : 'apply',
       resources,
