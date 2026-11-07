@@ -170,7 +170,7 @@ window.addEventListener('DOMContentLoaded', () => {
       #agy-modal-overlay details{border:1px solid #303036;border-radius:8px;margin:12px 0;padding:12px}#agy-modal-overlay summary{cursor:pointer;margin-bottom:10px;font-weight:500}
       .agy-fleet{margin:18px 0;border:1px solid #303036;border-radius:10px;padding:14px;min-width:0}.agy-fleet-table{width:100%;border-collapse:separate;border-spacing:0 12px;text-align:left;table-layout:fixed}.agy-fleet-table td{padding:0}.agy-fleet-card{background:#202024;border:1px solid #3f3f46;border-radius:10px;padding:16px;min-width:0}.agy-fleet-card-header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.agy-fleet-card-header .agy-actions{margin:0}.agy-fleet-label{font-size:14px;font-weight:600;overflow-wrap:anywhere}.agy-fleet-pools{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;margin-top:14px}.agy-fleet-pool{border:1px solid #303036;border-radius:8px;padding:12px;background:#18181b;min-width:0}.agy-fleet-pool .agy-actions{margin-bottom:0}.agy-fleet-account-state{margin-top:5px}.agy-pool-badge{display:inline-block;padding:2px 6px;border-radius:5px;background:#27272c;color:#a1a1aa;font-size:11px}.agy-pool-preferred,.agy-plan-pro{color:#86efac}.agy-pool-disabled{color:#fca5a5}.agy-fleet-quotas{display:grid;gap:10px;margin:12px 0}.agy-quota-group{display:grid;gap:8px}.agy-quota-group-title{font-size:11px;font-weight:600;color:#d4d4d8}.agy-quota-bucket{min-width:0}.agy-quota-heading{display:flex;justify-content:space-between;gap:8px;font-size:12px;flex-wrap:wrap}.agy-quota-bucket progress{display:block;width:100%;height:7px;margin:5px 0;accent-color:#86efac}.agy-quota-bucket[data-exhausted="true"] progress{accent-color:#f87171}.agy-quota-bucket[data-exhausted="true"] .agy-quota-value{color:#fca5a5}.agy-quota-reset{font-size:11px;color:#a1a1aa}.agy-fleet-fallback{display:flex;align-items:center;gap:8px;font-size:12px}.agy-fleet-fallback input{width:auto!important;accent-color:#86efac}.agy-fleet-details[hidden]{display:none}
       #agy-fleet-target-pool{font:inherit;color:#fafafa;background:#25252a;border:1px solid #414149;border-radius:6px;padding:6px;max-width:240px}#agy-fleet-target-pool option{background:#25252a;color:#fafafa}
-      .agy-model-search-box{padding:6px 8px}.agy-model-search-input{box-sizing:border-box;width:100%;font:inherit;color:inherit;background:transparent;border:1px solid #52525b;border-radius:5px;padding:6px}.agy-model-no-results{padding:8px;color:#a1a1aa;font-size:12px}
+      .agy-model-search-box{display:inline-flex!important;align-items:center!important;position:relative!important;margin:0 0 0 auto!important;padding:0!important;height:20px!important;flex:0 1 110px!important;min-width:72px!important;max-width:120px!important;vertical-align:middle!important;overflow:hidden!important}.agy-model-search-box--standalone{display:flex!important;margin:4px 6px!important;flex:none!important;max-width:none!important;width:calc(100% - 12px)!important}.agy-model-search-icon{position:absolute!important;left:6px!important;top:50%!important;transform:translateY(-50%)!important;width:10px!important;height:10px!important;pointer-events:none!important;opacity:.5!important;color:currentColor!important}.agy-model-search-input{box-sizing:border-box!important;width:100%!important;height:20px!important;min-height:0!important;max-height:20px!important;margin:0!important;padding:0 7px 0 19px!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;font-size:11px!important;line-height:18px!important;color:inherit!important;background:rgba(148,163,184,.08)!important;border:1px solid rgba(148,163,184,.16)!important;border-radius:999px!important;outline:none!important;box-shadow:none!important;appearance:none!important;-webkit-appearance:none!important;vertical-align:middle!important}.agy-model-search-input::placeholder{color:currentColor!important;opacity:.45!important;line-height:18px!important}.agy-model-search-input:hover,.agy-model-search-input:focus,.agy-model-search-input:not(:placeholder-shown){background:rgba(148,163,184,.13)!important;border-color:rgba(167,139,250,.42)!important}.agy-model-no-results{padding:6px 10px;color:#a1a1aa;font-size:11px}
       @media(max-width:600px){.agy-grid{grid-template-columns:1fr}#agy-modal-card{padding:16px}.agy-row .agy-actions{width:100%}}
     `;
         document.head.append(style);
@@ -1817,16 +1817,41 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
         installStyles();
         const box = element('div', 'agy-model-search-box');
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('viewBox', '0 0 16 16');
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        icon.setAttribute('stroke-width', '1.6');
+        icon.setAttribute('aria-hidden', 'true');
+        icon.setAttribute('class', 'agy-model-search-icon');
+        icon.innerHTML = '<circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14" stroke-linecap="round"></path>';
         const input = element('input', 'agy-model-search-input');
-        input.type = 'search';
-        input.placeholder = 'Search models…';
+        input.type = 'text';
+        input.autocomplete = 'off';
+        input.spellcheck = false;
+        input.placeholder = 'Filter…';
         input.setAttribute('aria-label', 'Search models');
         const empty = element('div', 'agy-model-no-results', 'No matching models');
         empty.hidden = true;
-        box.append(input);
+        box.append(icon, input);
         const header = Array.from(menu.querySelectorAll('*')).find((node) => !node.children.length && node.textContent?.trim() === 'Model');
-        (header || menu).insertAdjacentElement(header ? 'afterend' : 'afterbegin', box);
-        box.after(empty);
+        const prevHeaderStyle = header?.getAttribute('style') ?? null;
+        if (header) {
+            header.style.setProperty('display', 'flex', 'important');
+            header.style.setProperty('align-items', 'center', 'important');
+            header.style.setProperty('justify-content', 'space-between', 'important');
+            header.style.setProperty('flex-wrap', 'nowrap', 'important');
+            header.style.setProperty('gap', '6px', 'important');
+            header.style.setProperty('width', '100%', 'important');
+            header.style.setProperty('box-sizing', 'border-box', 'important');
+            header.append(box);
+            header.after(empty);
+        }
+        else {
+            box.classList.add('agy-model-search-box--standalone');
+            menu.insertAdjacentElement('afterbegin', box);
+            box.after(empty);
+        }
         const displays = new Map();
         const items = () => Array.from(menu.querySelectorAll('[role="menuitem"], [role="menuitemradio"], [role="option"], button'))
             .filter((node) => !node.parentElement?.closest('[role="menuitem"], [role="menuitemradio"], [role="option"]') &&
@@ -1882,10 +1907,24 @@ window.addEventListener('DOMContentLoaded', () => {
                     first?.focus();
             }
         });
-        pickerSearch = { menu, update, cleanup: () => { for (const node of displays.keys())
-                restore(node); box.remove(); empty.remove(); } };
+        pickerSearch = {
+            menu,
+            update,
+            cleanup: () => {
+                for (const node of displays.keys())
+                    restore(node);
+                box.remove();
+                empty.remove();
+                if (header) {
+                    if (prevHeaderStyle === null)
+                        header.removeAttribute('style');
+                    else
+                        header.setAttribute('style', prevHeaderStyle);
+                }
+            },
+        };
         setTimeout(() => { if (box.isConnected && pickerVisible(menu))
-            input.focus(); }, 0);
+            input.focus({ preventScroll: true }); }, 0);
     }
     function setupInjectionObserver() {
         injectCustomModelsSection();
