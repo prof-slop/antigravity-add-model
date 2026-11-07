@@ -56,7 +56,7 @@ function translateRequest(provider, body, modelName, apiFormat, stateKey) {
         return google.mapGeminiToGoogle(body, modelName);
     if (format === 'anthropic')
         return anthropic.mapGeminiToAnthropic(body, modelName, stateKey);
-    return openai.mapGeminiToOpenAI(body, modelName, stateKey);
+    return openai.mapGeminiToOpenAI(body, modelName, stateKey, provider);
 }
 function translateResponse(provider, response, stateKey, apiFormat, toolSchemas, artifactContext) {
     const format = (0, providers_1.resolveApiFormat)(provider, apiFormat);

@@ -763,7 +763,16 @@ window.addEventListener('DOMContentLoaded', () => {
             return `Resets in ${Math.floor(minutes / 60)}h ${minutes % 60}m`;
         return `Resets in ${minutes}m`;
     }
-    function renderPoolQuota(quota, cached) {
+    function quotaBucketFamily(text) {
+        return /argon/i.test(text)
+            ? 'argon'
+            : /claude|gpt|anthropic|openai|third[- ]?party|\b3p\b/i.test(text)
+                ? 'third-party'
+                : /gemini|google/i.test(text)
+                    ? 'gemini'
+                    : undefined;
+    }
+    function renderPoolQuota(quota, cached, owner) {
         if (cached?.quota?.planTier) {
             const tier = cached.quota.planTier;
             quota.append(element('span', `agy-pool-badge${/\bpro\b/i.test(tier) ? ' agy-plan-pro' : ''}`, tier));
@@ -776,13 +785,25 @@ window.addEventListener('DOMContentLoaded', () => {
             quota.append(element('span', 'agy-muted', 'Loading quota…'));
             return;
         }
-        // The flat snapshot contains every parsed bucket, including groups. Never
-        // deduplicate across projects, model pools, or distinct model buckets.
-        const buckets = cached.quota?.buckets || [];
-        if (!buckets.length) {
+        // The flat snapshot contains every parsed bucket, including groups. Filter
+        // to the owner model pool's quota family when matched so Argon, Flash/Pro,
+        // and Claude/GPT pools display their own quota without cross-pool duplication.
+        const allBuckets = cached.quota?.buckets || [];
+        if (!allBuckets.length) {
             quota.append(element('span', 'agy-muted', 'Quota unavailable — Google returned no buckets.'));
             return;
         }
+        const ownerFamily = owner
+            ? quotaBucketFamily(`${owner.externalModelName || ''} ${owner.displayName || ''} ${(owner.name || '').replace(/^models\/google-cloudcode\/?/i, '')}`)
+            : undefined;
+        const classify = (bucket) => quotaBucketFamily(`${bucket.groupName || ''} ${bucket.id} ${bucket.displayName || ''}`);
+        const targetFamily = ownerFamily === 'argon' && !allBuckets.some((bucket) => classify(bucket) === 'argon')
+            ? 'gemini'
+            : ownerFamily;
+        const matchedBuckets = targetFamily
+            ? allBuckets.filter((bucket) => classify(bucket) === targetFamily)
+            : [];
+        const buckets = matchedBuckets.length ? matchedBuckets : allBuckets;
         const groups = new Map();
         for (const bucket of buckets) {
             const title = bucket.groupName || 'Reported quota';
@@ -977,7 +998,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 poolHeading.append(poolIdentity, element('span', `agy-pool-badge${preferred ? ' agy-pool-preferred' : ''}`, !enabled ? 'Disabled' : preferred ? 'Preferred' : 'Automatic'));
                 pool.append(poolHeading);
                 const quota = element('div', 'agy-fleet-quotas');
-                renderPoolQuota(quota, cached);
+                renderPoolQuota(quota, cached, owner);
                 const rowActions = element('div', 'agy-actions');
                 const choose = button(preferred ? 'Automatic' : 'Use preferred', async () => {
                     await runFleetAction(async () => {

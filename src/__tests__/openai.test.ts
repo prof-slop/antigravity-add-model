@@ -344,6 +344,27 @@ describe('mapGeminiToOpenAI', () => {
     expect(assistant.reasoning_content).toBe('thinking...');
   });
 
+  it('omits reasoning_content on assistant messages when provider is mistral', () => {
+    const body = {
+      contents: [
+        {
+          role: 'model',
+          parts: [
+            { text: 'thinking...', thought: true },
+            { functionCall: { name: 'run_command', args: { CommandLine: 'ls' }, id: 'call_1' } },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [{ functionResponse: { name: 'run_command', response: { output: 'ok' }, id: 'call_1' } }],
+        },
+      ],
+    };
+    const result = mapGeminiToOpenAI(body, 'deepseek-v4-1-flash-1017', 'state1', 'mistral');
+    const assistant = result.messages.find((m) => m.role === 'assistant')!;
+    expect('reasoning_content' in assistant).toBe(false);
+  });
+
   it('should handle multiple contents', () => {
     const body = {
       contents: [
@@ -566,6 +587,65 @@ describe('mapOpenAIToGemini', () => {
     expect(parts.some((p) => p.thought)).toBe(true);
     expect(parts.some((p) => p.text === 'thinking...')).toBe(true);
     expect(parts.some((p) => p.text === 'answer')).toBe(true);
+  });
+
+  it('extracts Mistral Magistral thinking and text content blocks in non-stream and stream responses', () => {
+    const nonStream = mapOpenAIToGemini(
+      {
+        choices: [
+          {
+            message: {
+              content: [
+                { type: 'thinking', thinking: [{ type: 'text', text: 'Step 1: analyze Lorenz equations.' }] },
+                { type: 'text', text: 'Here is the Lorenz attractor.' },
+              ],
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      },
+      'magistral-medium-latest',
+    );
+    expect(nonStream.candidates[0].content.parts).toEqual([
+      { text: 'Step 1: analyze Lorenz equations.', thought: true },
+      { text: 'Here is the Lorenz attractor.' },
+    ]);
+
+    const streamThought = mapOpenAIChunkToGemini(
+      {
+        id: 'magistral-stream-1',
+        choices: [
+          {
+            delta: {
+              content: [{ type: 'thinking', thinking: [{ type: 'text', text: 'Streaming thought...' }] }],
+            },
+            index: 0,
+          },
+        ],
+      },
+      'magistral-medium-latest',
+      'magistral-stream-1',
+    );
+    expect(streamThought?.content.parts).toEqual([{ text: 'Streaming thought...', thought: true }]);
+
+    const streamText = mapOpenAIChunkToGemini(
+      {
+        id: 'magistral-stream-1',
+        choices: [
+          {
+            delta: {
+              content: [{ type: 'text', text: 'Final answer.' }],
+            },
+            finish_reason: 'stop',
+            index: 0,
+          },
+        ],
+      },
+      'magistral-medium-latest',
+      'magistral-stream-1',
+    );
+    expect(streamText?.content.parts).toEqual([{ text: 'Final answer.' }]);
+    expect(streamText?.finishReason).toBe('STOP');
   });
 
   it('should handle empty choices gracefully', () => {

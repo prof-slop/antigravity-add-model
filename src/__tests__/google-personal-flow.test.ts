@@ -81,7 +81,7 @@ describe('personal Google account onboarding through real local protocol fixture
         }
         return;
       }
-      if (req.headers['user-agent'] !== 'antigravity-add-model') {
+      if (req.headers['user-agent'] !== GOOGLE_CLOUD_CODE_USER_AGENT) {
         res.writeHead(403);
         res.end(JSON.stringify({ error: 'Cloud Code fixture requires the application User-Agent' }));
         return;

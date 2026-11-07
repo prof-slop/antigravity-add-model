@@ -31,6 +31,11 @@ import { resolveConfiguredSubagentModel } from './subagentModels';
 import { isGoogleQuotaFailure } from './googlePoolFailover';
 import { reasoningReplayCache } from './reasoningReplay';
 
+const DEFAULT_IDLE_TIMEOUT_MS = 180_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 900_000;
+const DEFAULT_RETRY_BUDGET_MS = 900_000;
+const STREAM_HEARTBEAT_INTERVAL_MS = 5_000;
+
 const circuits = new CircuitBreaker();
 const controllers = new Set<AbortController>();
 const counts = {
@@ -240,7 +245,9 @@ export async function runCustomModelRequest(
   res.once('close', onClose);
   let completed = false;
   let upstreamOutput = false;
-  const deadline = Date.now() + (primary.retryBudgetMs ?? Math.max(primary.timeout ?? 120_000, 120_000));
+  const deadline =
+    Date.now() +
+    (primary.retryBudgetMs ?? Math.max(primary.timeout ?? DEFAULT_REQUEST_TIMEOUT_MS, DEFAULT_RETRY_BUDGET_MS));
   let failure = new UpstreamError('No configured model is currently available.', 503);
   let effectiveModel = primary;
   const diagnostic = beginDiagnosticRequest({
@@ -250,6 +257,7 @@ export async function runCustomModelRequest(
     kind,
   });
 
+  let lastDownstreamWriteAt = 0;
   const writeCandidate = (candidate: unknown) => {
     if (signal.aborted || res.destroyed) throw new Error('Cancelled');
     prepared.context.modelName = effectiveModel.name;
@@ -261,6 +269,14 @@ export async function runCustomModelRequest(
         'X-Accel-Buffering': 'no',
       });
     res.write(`data: ${JSON.stringify(envelope({ candidates: [routed] }, cloudEnvelope))}\n\n`);
+    lastDownstreamWriteAt = Date.now();
+  };
+  const writeHeartbeat = () => {
+    if (signal.aborted || res.destroyed || !res.headersSent) return;
+    const now = Date.now();
+    if (now - lastDownstreamWriteAt < STREAM_HEARTBEAT_INTERVAL_MS) return;
+    res.write(': keepalive\n\n');
+    lastDownstreamWriteAt = now;
   };
 
   try {
@@ -415,12 +431,12 @@ export async function runCustomModelRequest(
               resolve,
             );
             request.once('error', reject);
-            request.setTimeout(model.idleTimeout ?? 30_000, () =>
+            request.setTimeout(model.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_MS, () =>
               request?.destroy(new UpstreamError('Upstream idle timeout.', 504)),
             );
             totalTimer = setTimeout(
               () => request?.destroy(new UpstreamError('Upstream request timeout.', 504)),
-              Math.min(model.timeout ?? 120_000, remaining),
+              Math.min(model.timeout ?? DEFAULT_REQUEST_TIMEOUT_MS, remaining),
             );
             signal.addEventListener('abort', abort, { once: true });
             request.end(JSON.stringify(payload));
@@ -541,6 +557,9 @@ export async function runCustomModelRequest(
                 if (mapped.finishReason && mapped.finishReason !== 'OTHER') finalReason = true;
                 // A role-only or empty completion must not commit headers and prevent fallback.
                 if (emitted) writeCandidate(mapped);
+              } else if (emitted && upstreamOutput) {
+                // Keep downstream SSE alive while buffering large tool-call argument deltas.
+                writeHeartbeat();
               }
             };
             const drain = () => {
@@ -550,6 +569,7 @@ export async function runCustomModelRequest(
                 buffer = buffer.slice(index + 1);
                 if (!line) event();
                 else if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
+                else if (line.startsWith(':') && emitted) writeHeartbeat();
               }
             };
             for await (const bytes of upstream) {

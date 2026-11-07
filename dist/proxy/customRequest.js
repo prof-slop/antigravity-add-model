@@ -56,6 +56,10 @@ const subagentRouting_1 = require("./subagentRouting");
 const subagentModels_1 = require("./subagentModels");
 const googlePoolFailover_1 = require("./googlePoolFailover");
 const reasoningReplay_1 = require("./reasoningReplay");
+const DEFAULT_IDLE_TIMEOUT_MS = 180000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 900000;
+const DEFAULT_RETRY_BUDGET_MS = 900000;
+const STREAM_HEARTBEAT_INTERVAL_MS = 5000;
 const circuits = new circuitBreaker_1.CircuitBreaker();
 const controllers = new Set();
 const counts = {
@@ -257,7 +261,8 @@ async function runCustomModelRequest(res, primary, originalBody, isStream, allMo
     res.once('close', onClose);
     let completed = false;
     let upstreamOutput = false;
-    const deadline = Date.now() + (primary.retryBudgetMs ?? Math.max(primary.timeout ?? 120000, 120000));
+    const deadline = Date.now() +
+        (primary.retryBudgetMs ?? Math.max(primary.timeout ?? DEFAULT_REQUEST_TIMEOUT_MS, DEFAULT_RETRY_BUDGET_MS));
     let failure = new UpstreamError('No configured model is currently available.', 503);
     let effectiveModel = primary;
     const diagnostic = (0, diagnostics_1.beginDiagnosticRequest)({
@@ -266,6 +271,7 @@ async function runCustomModelRequest(res, primary, originalBody, isStream, allMo
         stream: isStream,
         kind,
     });
+    let lastDownstreamWriteAt = 0;
     const writeCandidate = (candidate) => {
         if (signal.aborted || res.destroyed)
             throw new Error('Cancelled');
@@ -278,6 +284,16 @@ async function runCustomModelRequest(res, primary, originalBody, isStream, allMo
                 'X-Accel-Buffering': 'no',
             });
         res.write(`data: ${JSON.stringify(envelope({ candidates: [routed] }, cloudEnvelope))}\n\n`);
+        lastDownstreamWriteAt = Date.now();
+    };
+    const writeHeartbeat = () => {
+        if (signal.aborted || res.destroyed || !res.headersSent)
+            return;
+        const now = Date.now();
+        if (now - lastDownstreamWriteAt < STREAM_HEARTBEAT_INTERVAL_MS)
+            return;
+        res.write(': keepalive\n\n');
+        lastDownstreamWriteAt = now;
     };
     try {
         const chain = buildFallbackChain(primary, allModels);
@@ -411,8 +427,8 @@ async function runCustomModelRequest(res, primary, originalBody, isStream, allMo
                     const upstream = await new Promise((resolve, reject) => {
                         request = (url.protocol === 'https:' ? https : http).request(url, { method: 'POST', headers, rejectUnauthorized: !model.allowUnauthorized }, resolve);
                         request.once('error', reject);
-                        request.setTimeout(model.idleTimeout ?? 30000, () => request?.destroy(new UpstreamError('Upstream idle timeout.', 504)));
-                        totalTimer = setTimeout(() => request?.destroy(new UpstreamError('Upstream request timeout.', 504)), Math.min(model.timeout ?? 120000, remaining));
+                        request.setTimeout(model.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_MS, () => request?.destroy(new UpstreamError('Upstream idle timeout.', 504)));
+                        totalTimer = setTimeout(() => request?.destroy(new UpstreamError('Upstream request timeout.', 504)), Math.min(model.timeout ?? DEFAULT_REQUEST_TIMEOUT_MS, remaining));
                         signal.addEventListener('abort', abort, { once: true });
                         request.end(JSON.stringify(payload));
                     });
@@ -515,6 +531,10 @@ async function runCustomModelRequest(res, primary, originalBody, isStream, allMo
                                 if (emitted)
                                     writeCandidate(mapped);
                             }
+                            else if (emitted && upstreamOutput) {
+                                // Keep downstream SSE alive while buffering large tool-call argument deltas.
+                                writeHeartbeat();
+                            }
                         };
                         const drain = () => {
                             let index;
@@ -525,6 +545,8 @@ async function runCustomModelRequest(res, primary, originalBody, isStream, allMo
                                     event();
                                 else if (line.startsWith('data:'))
                                     dataLines.push(line.slice(5).replace(/^ /, ''));
+                                else if (line.startsWith(':') && emitted)
+                                    writeHeartbeat();
                             }
                         };
                         for await (const bytes of upstream) {

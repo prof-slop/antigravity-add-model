@@ -34,21 +34,36 @@ function parsedRequest(body: Buffer): Record<string, unknown> | undefined {
   }
 }
 
+const EFFORT_SUFFIX_RE = /-(?:minimal|low|medium|high|xhigh|tiered|thinking)$/i;
+
+function normalizeModelFamily(modelId: string): string {
+  return modelId.replace(/^models\//, '').replace(EFFORT_SUFFIX_RE, '');
+}
+
 /** No global credential aggregation: only one explicitly opted-in matching model is eligible. */
 export function resolveGoogleFailoverPool(models: PoolModel[], body: Buffer): PoolModel | undefined {
   const parsed = parsedRequest(body);
   if (typeof parsed?.model !== 'string') return undefined;
   const upstream = parsed.model.replace(/^models\//, '');
-  const matches = models.filter(
+  const eligible = models.filter(
     (model) =>
       model.enabled !== false &&
       model.provider === 'google-cloudcode' &&
       model.googlePool?.nativeFailoverEnabled === true &&
-      (model.externalModelName || model.name).replace(/^models\//, '') === upstream &&
       model.googleAccounts?.some((account) => account.enabled !== false),
   );
+  const exactMatches = eligible.filter(
+    (model) => (model.externalModelName || model.name).replace(/^models\//, '') === upstream,
+  );
+  if (exactMatches.length === 1) return exactMatches[0];
+  if (exactMatches.length > 1) return undefined;
+
+  const upstreamFamily = normalizeModelFamily(upstream);
+  const familyMatches = eligible.filter(
+    (model) => normalizeModelFamily(model.externalModelName || model.name) === upstreamFamily,
+  );
   // Even similar pools may have different projects or policies. Let the user choose one explicitly.
-  return matches.length === 1 ? matches[0] : undefined;
+  return familyMatches.length === 1 ? familyMatches[0] : undefined;
 }
 
 /** HTTP 400/403 require a structured, explicit Google rate-limit diagnosis. */
@@ -131,7 +146,7 @@ export async function attemptGooglePoolFailover(
   res.once('close', cancel);
   const timeout = setTimeout(
     () => controller.abort(),
-    options.timeoutMs ?? pool.retryBudgetMs ?? pool.timeout ?? 60_000,
+    options.timeoutMs ?? pool.retryBudgetMs ?? pool.timeout ?? 600_000,
   );
   let abandonAcquire: (() => void) | undefined;
   try {

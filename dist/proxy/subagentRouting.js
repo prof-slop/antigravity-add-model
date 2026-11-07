@@ -105,9 +105,13 @@ function stripHistoricalPromptMarkers(text) {
 }
 function subagents(call) {
     const args = object(call.args);
-    if (!args || !Array.isArray(args.Subagents))
+    if (!args)
         return undefined;
-    return args.Subagents.map(object);
+    if (Array.isArray(args.Subagents))
+        return args.Subagents.map(object);
+    if ('Prompt' in args || 'Model' in args || 'TypeName' in args || 'Role' in args)
+        return [args];
+    return undefined;
 }
 function callKey(scope, id) {
     return JSON.stringify([scope, id]);
@@ -297,13 +301,19 @@ class SubagentRoutingBridge {
                     continue;
                 for (const key of ['parameters', 'parametersJsonSchema']) {
                     const parameters = object(clone(declaration[key]));
-                    const array = object(object(parameters?.properties)?.Subagents);
-                    const properties = object(object(array?.items)?.properties);
-                    const model = object(properties?.Model);
-                    if (!model)
+                    const rootProps = object(parameters?.properties);
+                    const array = object(rootProps?.Subagents);
+                    const nestedProps = object(object(array?.items)?.properties);
+                    const topModel = object(rootProps?.Model);
+                    const nestedModel = object(nestedProps?.Model);
+                    if (!topModel && !nestedModel)
                         continue;
-                    delete model.enum;
-                    model.description = DESCRIPTION;
+                    for (const model of [topModel, nestedModel]) {
+                        if (!model)
+                            continue;
+                        delete model.enum;
+                        model.description = DESCRIPTION;
+                    }
                     declaration[key] = parameters;
                 }
             }

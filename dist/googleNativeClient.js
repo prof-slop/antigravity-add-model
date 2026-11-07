@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GOOGLE_NATIVE_SCOPES = void 0;
 exports.resolveGoogleNativeClient = resolveGoogleNativeClient;
 /** Read a public desktop OAuth profile from a recognized local vendor installation; never execute its code. */
+const node_crypto_1 = require("node:crypto");
 const fs = __importStar(require("node:fs"));
 const os = __importStar(require("node:os"));
 const path = __importStar(require("node:path"));
@@ -51,7 +52,18 @@ exports.GOOGLE_NATIVE_SCOPES = [
 const UNAVAILABLE = 'A supported Antigravity IDE installation (2.5.5) is required for Antigravity sign-in. ' +
     'For a portable installation, set ANTIGRAVITY_IDE_RESOURCES to its resources directory and restart the service, ' +
     'or use Custom Desktop OAuth.';
-function readFile(filename, maximum) {
+/**
+ * Public installed-app client identifier for the personal account flow. Client identifiers appear in every OAuth
+ * authorize URL and are not confidential; only the matching client secret is, and that is read from the vendor binary.
+ */
+const PERSONAL_CLIENT_ID = '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
+/** Non-reversible 64-bit SHA-256 fingerprint of `${clientId}:${clientSecret}` to verify pairing regardless of Go rodata sort order. */
+const PERSONAL_PAIR_SHA256_PREFIX = '6f5c1920f8566f36';
+const CLIENT_ID_SUFFIX = '.apps.googleusercontent.com';
+const CLIENT_SECRET_PREFIX = 'GOCSPX-';
+/** Installed-app secrets are "GOCSPX-" plus a 28-character body; the vendor string table stores no delimiter. */
+const CLIENT_SECRET_LENGTH = 35;
+function ensureNoSymlinks(filename) {
     const resolved = path.resolve(filename);
     let current = path.parse(resolved).root;
     for (const part of resolved.slice(current.length).split(path.sep).filter(Boolean)) {
@@ -59,6 +71,10 @@ function readFile(filename, maximum) {
         if (fs.lstatSync(current).isSymbolicLink())
             throw new Error(UNAVAILABLE);
     }
+    return resolved;
+}
+function readFile(filename, maximum) {
+    const resolved = ensureNoSymlinks(filename);
     const handle = fs.openSync(resolved, 'r');
     try {
         const stat = fs.fstatSync(handle);
@@ -72,6 +88,60 @@ function readFile(filename, maximum) {
     finally {
         fs.closeSync(handle);
     }
+}
+function readBinary(filename, maximum) {
+    const resolved = ensureNoSymlinks(filename);
+    const handle = fs.openSync(resolved, 'r');
+    try {
+        const stat = fs.fstatSync(handle);
+        if (!stat.isFile() || stat.size > maximum)
+            throw new Error(UNAVAILABLE);
+        return fs.readFileSync(handle);
+    }
+    finally {
+        fs.closeSync(handle);
+    }
+}
+/**
+ * Recover the personal OAuth pair from the vendor binary's string table. The vendor emits its client identifiers and
+ * client secrets in matching declaration order, so the secret is selected by the identifier's ordinal position.
+ * Any layout that does not line up fails closed instead of pairing the wrong secret with the personal client.
+ */
+function readVendorCredentials(binary) {
+    const identifiers = [];
+    for (let at = binary.indexOf(CLIENT_ID_SUFFIX); at !== -1; at = binary.indexOf(CLIENT_ID_SUFFIX, at + 1)) {
+        const window = binary.toString('latin1', Math.max(0, at - 64), at);
+        const match = /([0-9]{6,}-[a-z0-9]{20,})$/.exec(window);
+        if (match)
+            identifiers.push(match[1] + CLIENT_ID_SUFFIX);
+    }
+    const secrets = [];
+    for (let at = binary.indexOf(CLIENT_SECRET_PREFIX); at !== -1; at = binary.indexOf(CLIENT_SECRET_PREFIX, at + 1)) {
+        const candidate = binary.toString('latin1', at, Math.min(binary.length, at + CLIENT_SECRET_LENGTH));
+        if (/^GOCSPX-[A-Za-z0-9_-]{28}$/.test(candidate))
+            secrets.push(candidate);
+    }
+    const index = identifiers.indexOf(PERSONAL_CLIENT_ID);
+    if (index < 0 || new Set(identifiers).size !== identifiers.length || new Set(secrets).size !== secrets.length) {
+        throw new Error(UNAVAILABLE);
+    }
+    const verified = secrets.find((secret) => (0, node_crypto_1.createHash)('sha256').update(`${PERSONAL_CLIENT_ID}:${secret}`).digest('hex').slice(0, 16) ===
+        PERSONAL_PAIR_SHA256_PREFIX);
+    if (verified)
+        return { clientId: PERSONAL_CLIENT_ID, clientSecret: verified };
+    if (identifiers.length !== secrets.length)
+        throw new Error(UNAVAILABLE);
+    return { clientId: PERSONAL_CLIENT_ID, clientSecret: secrets[index] };
+}
+function inspectLanguageServer(resourcesDir) {
+    const binaryName = process.platform === 'win32' ? 'language_server.exe' : 'language_server';
+    const binary = readBinary(path.join(resourcesDir, 'bin', binaryName), 256 * 1024 * 1024);
+    const credentials = readVendorCredentials(binary);
+    for (const scope of exports.GOOGLE_NATIVE_SCOPES) {
+        if (!binary.includes(Buffer.from(scope)))
+            throw new Error(UNAVAILABLE);
+    }
+    return { ...credentials, scopes: [...exports.GOOGLE_NATIVE_SCOPES] };
 }
 function inspect(app) {
     const pkg = JSON.parse(readFile(path.join(app, 'package.json'), 256 * 1024));
@@ -162,6 +232,20 @@ function resolveGoogleNativeClient(options = {}) {
         ]) {
             try {
                 return inspect(app);
+            }
+            catch {
+                /* Try other recognized install layouts without exposing vendor contents or paths. */
+            }
+        }
+    }
+    for (const root of roots) {
+        for (const resDir of [
+            path.join(root, 'Contents/Resources'),
+            path.join(root, 'resources'),
+            root,
+        ]) {
+            try {
+                return inspectLanguageServer(resDir);
             }
             catch {
                 /* Try other recognized install layouts without exposing vendor contents or paths. */

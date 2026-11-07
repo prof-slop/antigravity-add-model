@@ -13,13 +13,28 @@ const mainWorldScript = `(() => {
   window.__antigravity_csp_relaxed__ = true;
 
   const SAFE_SANDBOX = "allow-scripts allow-forms allow-downloads allow-modals";
+  const FORBIDDEN_SANDBOX_TOKENS = new Set([
+    'allow-same-origin',
+    'allow-popups-to-escape-sandbox',
+    'allow-top-navigation',
+    'allow-top-navigation-by-user-activation'
+  ]);
   let isMutatingInternal = false;
+
+  function isArtifactFrame(iframe) {
+    if (!iframe || iframe.tagName !== 'IFRAME') return false;
+    return Boolean(
+      iframe.hasAttribute('srcdoc') ||
+      iframe.srcdoc ||
+      (iframe.closest && iframe.closest('.artifact-container, div[data-artifact], [data-testid*="embed" i], [data-testid*="artifact" i]'))
+    );
+  }
 
   function sanitizeSandbox(sandboxVal) {
     if (!sandboxVal || typeof sandboxVal !== 'string') return SAFE_SANDBOX;
     const tokens = sandboxVal.split(/\\s+/).filter(t => {
       const lower = t.toLowerCase();
-      return lower && lower !== 'allow-same-origin' && lower !== 'allow-popups-to-escape-sandbox';
+      return lower && !FORBIDDEN_SANDBOX_TOKENS.has(lower);
     });
     if (!tokens.includes('allow-scripts')) tokens.push('allow-scripts');
     return tokens.join(' ');
@@ -27,9 +42,9 @@ const mainWorldScript = `(() => {
 
   function isSandboxSafe(sandboxVal) {
     if (!sandboxVal || typeof sandboxVal !== 'string') return false;
-    const lower = sandboxVal.toLowerCase();
-    if (lower.includes('allow-same-origin') || lower.includes('allow-popups-to-escape-sandbox')) return false;
-    return lower.includes('allow-scripts');
+    const tokens = sandboxVal.trim().toLowerCase().split(/\\s+/);
+    if (tokens.some(t => FORBIDDEN_SANDBOX_TOKENS.has(t))) return false;
+    return tokens.includes('allow-scripts');
   }
 
   function rewriteCSP(html) {
@@ -39,10 +54,10 @@ const mainWorldScript = `(() => {
     if (typeof html !== 'string') return html;
     if (html.includes('data-ag-csp="1"')) return html;
     if (/<meta[^>]*Content-Security-Policy[^>]*>/i.test(html)) {
-      return html.replace(/<meta[^>]*Content-Security-Policy[^>]*>/gi, ${JSON.stringify(CSP_TAG)});
+      return html.replace(/<meta[^>]*Content-Security-Policy[^>]*>/gi, () => ${JSON.stringify(CSP_TAG)});
     }
     if (/<head\\b[^>]*>/i.test(html)) {
-      return html.replace(/<head\\b[^>]*>/i, "$&" + ${JSON.stringify(CSP_TAG)});
+      return html.replace(/<head\\b[^>]*>/i, (match) => match + ${JSON.stringify(CSP_TAG)});
     }
     return ${JSON.stringify(CSP_TAG)} + html;
   }
@@ -53,7 +68,13 @@ const mainWorldScript = `(() => {
     if (srcdocDesc && srcdocDesc.set) {
       const origSet = srcdocDesc.set;
       Object.defineProperty(HTMLIFrameElement.prototype, 'srcdoc', {
-        set(val) { return origSet.call(this, rewriteCSP(val)); },
+        set(val) {
+          const rewritten = rewriteCSP(val);
+          if (!this.hasAttribute('sandbox') || !isSandboxSafe(this.getAttribute('sandbox'))) {
+            try { this.setAttribute('sandbox', sanitizeSandbox(this.getAttribute('sandbox'))); } catch (_) {}
+          }
+          return origSet.call(this, rewritten);
+        },
         get() { return srcdocDesc.get.call(this); },
         configurable: true,
         enumerable: true
@@ -67,32 +88,45 @@ const mainWorldScript = `(() => {
     Element.prototype.setAttribute = function(name, val) {
       if (typeof name === 'string' && (this.tagName === 'IFRAME' || this instanceof HTMLIFrameElement)) {
         const lower = name.toLowerCase();
-        if (lower === 'srcdoc' && typeof val === 'string') val = rewriteCSP(val);
-        else if (lower === 'sandbox' && typeof val === 'string') val = sanitizeSandbox(val);
+        if (lower === 'srcdoc') {
+          val = rewriteCSP(val);
+          if (!isMutatingInternal && (!this.hasAttribute('sandbox') || !isSandboxSafe(this.getAttribute('sandbox')))) {
+            origSetAttribute.call(this, 'sandbox', sanitizeSandbox(this.getAttribute('sandbox')));
+          }
+        } else if (lower === 'sandbox' && typeof val === 'string') {
+          val = sanitizeSandbox(val);
+        }
       }
       return origSetAttribute.call(this, name, val);
     };
   } catch (_) {}
 
-  // Hook removeAttribute to preserve sandbox protection
+  // Hook removeAttribute to preserve sandbox protection on artifact iframes (SEC-12)
   try {
     const origRemoveAttribute = Element.prototype.removeAttribute;
     Element.prototype.removeAttribute = function(name) {
       if (typeof name === 'string' && name.toLowerCase() === 'sandbox' && (this.tagName === 'IFRAME' || this instanceof HTMLIFrameElement)) {
-        this.setAttribute('sandbox', SAFE_SANDBOX);
-        return;
+        if (isArtifactFrame(this)) {
+          this.setAttribute('sandbox', SAFE_SANDBOX);
+          return;
+        }
       }
       return origRemoveAttribute.call(this, name);
     };
   } catch (_) {}
 
-  // Hook DOMTokenList
+  // Hook DOMTokenList.value & .add scoped strictly to sandbox tokens (SEC-13, REDUN-03, CSP-07)
   try {
     const tokenListValDesc = Object.getOwnPropertyDescriptor(DOMTokenList.prototype, 'value');
     if (tokenListValDesc && tokenListValDesc.set) {
       const origTokenValSet = tokenListValDesc.set;
       Object.defineProperty(DOMTokenList.prototype, 'value', {
-        set(val) { return origTokenValSet.call(this, typeof val === 'string' ? sanitizeSandbox(val) : val); },
+        set(val) {
+          if (typeof val === 'string' && /\\ballow-/i.test(val)) {
+            val = sanitizeSandbox(val);
+          }
+          return origTokenValSet.call(this, val);
+        },
         get() { return tokenListValDesc.get ? tokenListValDesc.get.call(this) : ''; },
         configurable: true,
         enumerable: true
@@ -100,15 +134,60 @@ const mainWorldScript = `(() => {
     }
   } catch (_) {}
 
-  // Clean iframe helper
+  try {
+    const origTokenAdd = DOMTokenList.prototype.add;
+    DOMTokenList.prototype.add = function(...tokens) {
+      const hasSandboxToken = tokens.some(t => String(t).toLowerCase().startsWith('allow-'));
+      if (!hasSandboxToken) {
+        return origTokenAdd.apply(this, tokens);
+      }
+      const filtered = tokens.filter(t => !FORBIDDEN_SANDBOX_TOKENS.has(String(t).toLowerCase()));
+      if (filtered.length > 0) {
+        return origTokenAdd.apply(this, filtered);
+      }
+    };
+  } catch (_) {}
+
+  // Hook innerHTML and insertAdjacentHTML pre-parser (SEC-16)
+  try {
+    const innerHTMLDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+    if (innerHTMLDesc && innerHTMLDesc.set) {
+      const origInnerHTMLSet = innerHTMLDesc.set;
+      Object.defineProperty(Element.prototype, 'innerHTML', {
+        set(val) {
+          if (typeof val === 'string' && /<iframe\\b/i.test(val) && /content-security-policy/i.test(val)) {
+            val = rewriteCSP(val);
+          }
+          return origInnerHTMLSet.call(this, val);
+        },
+        get() { return innerHTMLDesc.get.call(this); },
+        configurable: true,
+        enumerable: true
+      });
+    }
+  } catch (_) {}
+
+  try {
+    const origInsertAdjacentHTML = Element.prototype.insertAdjacentHTML;
+    Element.prototype.insertAdjacentHTML = function(position, text) {
+      if (typeof text === 'string' && /<iframe\\b/i.test(text) && /content-security-policy/i.test(text)) {
+        text = rewriteCSP(text);
+      }
+      return origInsertAdjacentHTML.call(this, position, text);
+    };
+  } catch (_) {}
+
+  // Clean iframe helper with artifact scoping & TrustedHTML coercion (SEC-12, TRUST-01)
   function cleanIframe(iframe) {
     if (!iframe || iframe.tagName !== 'IFRAME') return;
     try {
       const currentSandbox = iframe.getAttribute('sandbox');
       if (currentSandbox === null) {
-        isMutatingInternal = true;
-        iframe.setAttribute('sandbox', SAFE_SANDBOX);
-        isMutatingInternal = false;
+        if (isArtifactFrame(iframe)) {
+          isMutatingInternal = true;
+          iframe.setAttribute('sandbox', SAFE_SANDBOX);
+          isMutatingInternal = false;
+        }
       } else if (!isSandboxSafe(currentSandbox)) {
         const clean = sanitizeSandbox(currentSandbox);
         if (currentSandbox !== clean) {
@@ -118,19 +197,24 @@ const mainWorldScript = `(() => {
         }
       }
       let currentSrcdoc = iframe.getAttribute('srcdoc') || iframe.srcdoc;
-      if (typeof currentSrcdoc === 'string' && !currentSrcdoc.includes('data-ag-csp="1"') && /<meta[^>]*Content-Security-Policy[^>]*>/i.test(currentSrcdoc)) {
+      if (currentSrcdoc && typeof currentSrcdoc === 'object') {
+        try { if (typeof currentSrcdoc.toString === 'function') currentSrcdoc = currentSrcdoc.toString(); } catch (_) {}
+      }
+      if (typeof currentSrcdoc === 'string' && currentSrcdoc.length > 0 && !currentSrcdoc.includes('data-ag-csp="1"')) {
         const rewritten = rewriteCSP(currentSrcdoc);
-        isMutatingInternal = true;
-        iframe.setAttribute('srcdoc', rewritten);
-        iframe.srcdoc = rewritten;
-        isMutatingInternal = false;
+        if (rewritten !== currentSrcdoc) {
+          isMutatingInternal = true;
+          iframe.setAttribute('srcdoc', rewritten);
+          iframe.srcdoc = rewritten;
+          isMutatingInternal = false;
+        }
       }
     } catch (_) {
       isMutatingInternal = false;
     }
   }
 
-  // Observe DOM additions
+  // Observe DOM additions with element filtering (PERF-05)
   try {
     const observer = new MutationObserver((mutations) => {
       if (isMutatingInternal) return;
@@ -139,7 +223,7 @@ const mainWorldScript = `(() => {
           for (const node of m.addedNodes) {
             if (node.nodeType !== 1) continue;
             if (node.tagName === 'IFRAME') cleanIframe(node);
-            else if (node.querySelectorAll) node.querySelectorAll('iframe').forEach(cleanIframe);
+            else if (node.firstElementChild && node.querySelectorAll) node.querySelectorAll('iframe').forEach(cleanIframe);
           }
         } else if (m.type === 'attributes' && m.target && m.target.tagName === 'IFRAME') {
           cleanIframe(m.target);
@@ -156,6 +240,7 @@ const mainWorldScript = `(() => {
 
   document.querySelectorAll('iframe').forEach(cleanIframe);
   window.addEventListener('DOMContentLoaded', () => document.querySelectorAll('iframe').forEach(cleanIframe));
+  window.addEventListener('load', () => document.querySelectorAll('iframe').forEach(cleanIframe));
 })();`;
 try {
     if (electron_1.webFrame && electron_1.webFrame.executeJavaScript) {

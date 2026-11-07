@@ -225,8 +225,16 @@ function matchCustomModel(models: CustomModel[], ...selectors: unknown[]): Custo
   });
 }
 
+function isNativeFailoverPoolOnly(model: CustomModel): boolean {
+  return model.provider === 'google-cloudcode' && model.googlePool?.nativeFailoverEnabled === true;
+}
+
+function selectorCustomModels(): CustomModel[] {
+  return loadCustomModels().filter((model) => !isNativeFailoverPoolOnly(model));
+}
+
 function customCloudCodeCatalog(upstream: unknown = {}): Record<string, unknown> {
-  const models = loadCustomModels();
+  const models = selectorCustomModels();
   const identities = modelIdentities(models, upstream);
   const labels = catalogDisplayNames(models, upstream);
   return mergeCloudCodeCatalog(
@@ -726,8 +734,9 @@ function forwardToGoogle(
     }
     failForwarding(502, 'Proxy forwarding failed: ' + err.message);
   });
-  proxyReq.setTimeout(60_000, () => {
-    log.error('[Proxy] Google proxy request timed out after 60s');
+  const forwardIdleTimeoutMs = isGeneration ? 300_000 : 60_000;
+  proxyReq.setTimeout(forwardIdleTimeoutMs, () => {
+    log.error(`[Proxy] Google proxy request timed out after ${Math.round(forwardIdleTimeoutMs / 1000)}s`);
     if (nativeResponse) nativeResponse.destroy(new Error('Google API request timed out'));
     else failForwarding(504, 'Google API request timed out');
     proxyReq.destroy();
@@ -1029,7 +1038,7 @@ function handleGetAvailableModelsProxy(res: http.ServerResponse, reqBody: Buffer
     lsRes.on('data', (chunk: Buffer) => chunks.push(chunk));
     lsRes.on('end', () => {
       const responseBuf = Buffer.concat(chunks);
-      const customModels = loadCustomModels();
+      const customModels = selectorCustomModels();
       const identities = modelIdentities(customModels);
       let modifiedBuf = responseBuf;
 
@@ -1291,7 +1300,7 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
           log.error('[Proxy] Models list forward request timed out');
           googleReq.destroy();
           if (!res.headersSent) {
-            const customModels = loadCustomModels();
+            const customModels = selectorCustomModels();
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(
               JSON.stringify({
@@ -1312,7 +1321,7 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
         googleRes.on('end', () => {
           try {
             const googleJson = JSON.parse(googleBody) as { models?: unknown[] };
-            const customModels = loadCustomModels();
+            const customModels = selectorCustomModels();
 
             const mappedCustom = customModels.map((m) => ({
               name: m.name,
@@ -1338,7 +1347,7 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
             res.end(JSON.stringify(googleJson));
           } catch (err) {
             log.error('[Proxy] Google list models failed, returning custom models list only:', err);
-            const customModels = loadCustomModels();
+            const customModels = selectorCustomModels();
             const mappedCustom = customModels.map((m) => ({
               name: m.name,
               version: '1.0',
@@ -1358,7 +1367,7 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
       googleReq.on('error', (err) => {
         if (stoppingProxy || res.destroyed || res.writableEnded || res.socket?.destroyed) return;
         log.error('[Proxy] Google models list request error:', err);
-        const customModels = loadCustomModels();
+        const customModels = selectorCustomModels();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({

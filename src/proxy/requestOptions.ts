@@ -211,8 +211,41 @@ export function applyRequestOptions(
     delete result.stream;
     const generation = { ...((result.generationConfig as Record<string, unknown>) || {}) };
     if (model.maxOutputTokens !== undefined) generation.maxOutputTokens = model.maxOutputTokens;
-    if (compactionEffort === undefined && model.thinkingBudget !== undefined)
-      generation.thinkingConfig = { thinkingBudget: model.thinkingBudget };
+    if (compactionEffort === undefined) {
+      if (model.thinkingBudget !== undefined) {
+        generation.thinkingConfig = {
+          ...((generation.thinkingConfig as Record<string, unknown>) || {}),
+          thinkingBudget: model.thinkingBudget,
+        };
+      } else if (model.reasoningEffort !== undefined) {
+        const name = (model.externalModelName || model.name).replace(/^models\//, '').toLowerCase();
+        const version = name.match(/(?:^|\/)gemini-(\d+)(?:[.-]|$)/);
+        const budget = { none: 0, minimal: 1024, low: 1024, medium: 4096, high: 8192, xhigh: 16384 }[
+          model.reasoningEffort
+        ];
+        if (version && Number(version[1]) >= 3) {
+          const minimal = /(?:^|\/)gemini-(?:3-flash|3\.1-flash-lite|3\.5-flash-lite|3\.6-flash)(?:-|$)/.test(name);
+          const level =
+            model.reasoningEffort === 'high' || model.reasoningEffort === 'xhigh'
+              ? 'HIGH'
+              : model.reasoningEffort === 'medium'
+                ? 'MEDIUM'
+                : minimal && (model.reasoningEffort === 'none' || model.reasoningEffort === 'minimal')
+                  ? 'MINIMAL'
+                  : 'LOW';
+          generation.thinkingConfig = {
+            ...((generation.thinkingConfig as Record<string, unknown>) || {}),
+            thinkingLevel: /^gemini-3-pro(?:-|$)/.test(name) && level === 'MEDIUM' ? 'HIGH' : level,
+          };
+        } else {
+          generation.thinkingConfig = {
+            ...((generation.thinkingConfig as Record<string, unknown>) || {}),
+            thinkingBudget:
+              model.reasoningEffort === 'none' && /(?:^|\/)gemini-2\.5-pro(?:-|$)/.test(name) ? 128 : budget,
+          };
+        }
+      }
+    }
     result.generationConfig = generation;
   } else {
     result.stream = stream;
@@ -231,6 +264,15 @@ export function applyRequestOptions(
         }
         result.thinking = { type: 'enabled', budget_tokens: model.thinkingBudget };
         delete result.temperature;
+      }
+    }
+  }
+  if (format === 'openai') {
+    if (/^mistral$/i.test(model.provider) || /^https?:\/\/api\.mistral\.ai(?:\/|$)/i.test(model.apiUrl)) {
+      for (const message of Array.isArray(result.messages) ? result.messages : []) {
+        if (message && typeof message === 'object' && !Array.isArray(message)) {
+          delete (message as Record<string, unknown>).reasoning_content;
+        }
       }
     }
   }

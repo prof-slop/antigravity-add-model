@@ -595,16 +595,14 @@ export async function deploy(options = {}, operations = {}) {
     asar.uncache(files.archive);
     if (process.platform === 'darwin') {
       try {
-        let appPath = '/Applications/Antigravity.app';
-        const appIndex = resources.indexOf('.app');
+        const appIndex = resources.lastIndexOf('.app');
         if (appIndex !== -1) {
-          const candidate = resources.slice(0, appIndex + 4);
-          if (exists(candidate)) appPath = candidate;
-        }
-        if (exists(appPath) && (resources.includes('.app') || resources.includes('/Applications/'))) {
-          const { execSync } = await import('node:child_process');
-          execSync(`codesign --force --deep --sign - ${JSON.stringify(appPath)}`, { stdio: 'ignore' });
-          console.log(`[deploy] Re-signed ${appPath} with ad-hoc signature.`);
+          const appPath = resources.slice(0, appIndex + 4);
+          if (exists(appPath)) {
+            const { execFileSync } = await import('node:child_process');
+            execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], { stdio: 'ignore' });
+            console.log(`[deploy] Re-signed ${appPath} with ad-hoc signature.`);
+          }
         }
       } catch (err) {
         console.warn('[deploy] Notice: codesign failed or skipped:', err?.message || String(err));

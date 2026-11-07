@@ -17,14 +17,15 @@ function install(getLanguageServerPort) {
     void electron_1.app.whenReady().then(() => {
         // Strip restrictive Content-Security-Policy and X-Frame-Options on web responses
         electron_1.session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-            if (details.responseHeaders &&
-                (details.responseHeaders['content-security-policy'] ||
-                    details.responseHeaders['content-security-policy-report-only'] ||
-                    details.responseHeaders['x-frame-options'])) {
+            if (!details.responseHeaders) {
+                callback({ responseHeaders: details.responseHeaders });
+                return;
+            }
+            const stripKeys = Object.keys(details.responseHeaders).filter((key) => /^(?:content-security-policy(?:-report-only)?|x-frame-options)$/i.test(key));
+            if (stripKeys.length > 0) {
                 const responseHeaders = { ...details.responseHeaders };
-                delete responseHeaders['content-security-policy'];
-                delete responseHeaders['content-security-policy-report-only'];
-                delete responseHeaders['x-frame-options'];
+                for (const key of stripKeys)
+                    delete responseHeaders[key];
                 callback({ responseHeaders });
             }
             else {

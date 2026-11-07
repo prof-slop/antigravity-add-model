@@ -51,19 +51,29 @@ function parsedRequest(body) {
         return undefined;
     }
 }
+const EFFORT_SUFFIX_RE = /-(?:minimal|low|medium|high|xhigh|tiered|thinking)$/i;
+function normalizeModelFamily(modelId) {
+    return modelId.replace(/^models\//, '').replace(EFFORT_SUFFIX_RE, '');
+}
 /** No global credential aggregation: only one explicitly opted-in matching model is eligible. */
 function resolveGoogleFailoverPool(models, body) {
     const parsed = parsedRequest(body);
     if (typeof parsed?.model !== 'string')
         return undefined;
     const upstream = parsed.model.replace(/^models\//, '');
-    const matches = models.filter((model) => model.enabled !== false &&
+    const eligible = models.filter((model) => model.enabled !== false &&
         model.provider === 'google-cloudcode' &&
         model.googlePool?.nativeFailoverEnabled === true &&
-        (model.externalModelName || model.name).replace(/^models\//, '') === upstream &&
         model.googleAccounts?.some((account) => account.enabled !== false));
+    const exactMatches = eligible.filter((model) => (model.externalModelName || model.name).replace(/^models\//, '') === upstream);
+    if (exactMatches.length === 1)
+        return exactMatches[0];
+    if (exactMatches.length > 1)
+        return undefined;
+    const upstreamFamily = normalizeModelFamily(upstream);
+    const familyMatches = eligible.filter((model) => normalizeModelFamily(model.externalModelName || model.name) === upstreamFamily);
     // Even similar pools may have different projects or policies. Let the user choose one explicitly.
-    return matches.length === 1 ? matches[0] : undefined;
+    return familyMatches.length === 1 ? familyMatches[0] : undefined;
 }
 /** HTTP 400/403 require a structured, explicit Google rate-limit diagnosis. */
 function isGoogleQuotaFailure(status, body) {
@@ -126,7 +136,7 @@ async function attemptGooglePoolFailover(req, res, reqBody, errorRes, errorBody,
             controller.abort();
     };
     res.once('close', cancel);
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? pool.retryBudgetMs ?? pool.timeout ?? 60000);
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? pool.retryBudgetMs ?? pool.timeout ?? 600000);
     let abandonAcquire;
     try {
         const maximum = Math.min(3, candidates.length);

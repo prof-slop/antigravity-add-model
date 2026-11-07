@@ -65,7 +65,7 @@ function compactContent(parts) {
         ? parts
         : parts.map((part) => (part.type === 'text' ? part.text : '')).join('\n');
 }
-function mapAssistantMessage(parts) {
+function mapAssistantMessage(parts, includeReasoningContent = true) {
     let content = '';
     let reasoning = '';
     for (const part of parts) {
@@ -75,7 +75,11 @@ function mapAssistantMessage(parts) {
             content += part.text || '';
     }
     // Replay reasoning from this history item for both ordinary and tool-call turns.
-    return { role: 'assistant', content, ...(reasoning ? { reasoning_content: reasoning } : {}) };
+    return {
+        role: 'assistant',
+        content,
+        ...(includeReasoningContent && reasoning ? { reasoning_content: reasoning } : {}),
+    };
 }
 function mapGeminiToolsToOpenAI(geminiTools) {
     if (!geminiTools || !Array.isArray(geminiTools))
@@ -99,7 +103,8 @@ function mapGeminiToolsToOpenAI(geminiTools) {
     }
     return openaiTools;
 }
-function mapGeminiToOpenAI(geminiBody, modelName, stateKey = modelName) {
+function mapGeminiToOpenAI(geminiBody, modelName, stateKey = modelName, provider) {
+    const omitReasoningContent = provider?.toLowerCase() === 'mistral';
     const messages = [];
     const historyCallIds = new Map();
     const pendingToolResponseContent = [];
@@ -149,7 +154,7 @@ function mapGeminiToOpenAI(geminiBody, modelName, stateKey = modelName) {
                             });
                         }
                     }
-                    const message = mapAssistantMessage(item.parts);
+                    const message = mapAssistantMessage(item.parts, !omitReasoningContent);
                     message.content = message.content || null;
                     message.tool_calls = toolCalls;
                     messages.push(message);
@@ -184,7 +189,7 @@ function mapGeminiToOpenAI(geminiBody, modelName, stateKey = modelName) {
                 else {
                     const role = item.role === 'model' ? 'assistant' : item.role || 'user';
                     if (role === 'assistant') {
-                        messages.push(mapAssistantMessage(item.parts));
+                        messages.push(mapAssistantMessage(item.parts, !omitReasoningContent));
                     }
                     else {
                         messages.push({ role, content: compactContent(mapUserContentParts(item.parts)) });
@@ -195,16 +200,18 @@ function mapGeminiToOpenAI(geminiBody, modelName, stateKey = modelName) {
     }
     // Keep feedback after all consecutive tool results, including split parallel responses.
     flushToolResponseContent();
-    // Inject reasoning_content into assistant messages missing it
-    let lastAssistantIdx = -1;
-    for (let i = 0; i < messages.length; i++) {
-        if (messages[i].role === 'assistant')
-            lastAssistantIdx = i;
-    }
-    for (let i = 0; i < messages.length; i++) {
-        if (messages[i].role === 'assistant' && !messages[i].reasoning_content) {
-            const preservedReasoning = shared_1.modelReasoningContent.get(stateKey) || '';
-            messages[i].reasoning_content = i === lastAssistantIdx && preservedReasoning ? preservedReasoning : '';
+    // Inject reasoning_content into assistant messages missing it (skip for Mistral, which rejects extra fields with HTTP 422)
+    if (!omitReasoningContent) {
+        let lastAssistantIdx = -1;
+        for (let i = 0; i < messages.length; i++) {
+            if (messages[i].role === 'assistant')
+                lastAssistantIdx = i;
+        }
+        for (let i = 0; i < messages.length; i++) {
+            if (messages[i].role === 'assistant' && !messages[i].reasoning_content) {
+                const preservedReasoning = shared_1.modelReasoningContent.get(stateKey) || '';
+                messages[i].reasoning_content = i === lastAssistantIdx && preservedReasoning ? preservedReasoning : '';
+            }
         }
     }
     // Models requiring max_completion_tokens instead of max_tokens:
@@ -276,9 +283,49 @@ function parseDSMLToolCalls(text) {
         return null;
     }
 }
+function extractContentAndThinking(rawContent) {
+    if (typeof rawContent === 'string')
+        return { text: rawContent, thinking: '' };
+    if (!Array.isArray(rawContent))
+        return { text: '', thinking: '' };
+    let text = '';
+    let thinking = '';
+    for (const item of rawContent) {
+        if (!item || typeof item !== 'object')
+            continue;
+        const block = item;
+        if (block.type === 'thinking') {
+            if (typeof block.thinking === 'string') {
+                thinking += block.thinking;
+            }
+            else if (Array.isArray(block.thinking)) {
+                for (const sub of block.thinking) {
+                    if (sub && typeof sub === 'object' && typeof sub.text === 'string') {
+                        thinking += sub.text;
+                    }
+                }
+            }
+            else if (typeof block.text === 'string') {
+                thinking += block.text;
+            }
+        }
+        else if (block.type === 'reasoning') {
+            if (typeof block.reasoning === 'string')
+                thinking += block.reasoning;
+            else if (typeof block.text === 'string')
+                thinking += block.text;
+        }
+        else if (typeof block.text === 'string') {
+            text += block.text;
+        }
+    }
+    return { text, thinking };
+}
 function mapOpenAIToGemini(openAiRes, modelName, toolSchemas) {
     const choice = openAiRes.choices?.[0];
-    const reasoning = choice?.message?.reasoning_content || choice?.message?.reasoning || '';
+    const extracted = extractContentAndThinking(choice?.message?.content);
+    const reasoning = (choice?.message?.reasoning_content || choice?.message?.reasoning || '') + extracted.thinking;
+    const text = extracted.text;
     if (choice?.message?.tool_calls && choice.message.tool_calls.length > 0) {
         const parts = choice.message.tool_calls.map((tc) => {
             let args;
@@ -310,8 +357,8 @@ function mapOpenAIToGemini(openAiRes, modelName, toolSchemas) {
             }
             return { functionCall: { name: translated.name, args: translated.args, id: tc.id } };
         });
-        if (choice.message.content)
-            parts.unshift({ text: choice.message.content });
+        if (text)
+            parts.unshift({ text });
         if (reasoning)
             parts.unshift({ text: reasoning, thought: true });
         return {
@@ -323,7 +370,6 @@ function mapOpenAIToGemini(openAiRes, modelName, toolSchemas) {
             },
         };
     }
-    const text = choice?.message?.content || '';
     const dsml = parseDSMLToolCalls(text);
     if (dsml && dsml.functionCalls.length > 0) {
         const parts = dsml.functionCalls.map((fc) => {
@@ -409,17 +455,23 @@ function mapOpenAIChunkToGemini(chunk, modelName, streamKey, toolSchemas) {
     }
     const finishReason = choice.finish_reason;
     const completed = finishReason === 'stop' || finishReason === 'length' || finishReason === 'tool_calls';
-    if (delta?.content)
-        context.accumulatedText += delta.content;
-    const reasoning = delta?.reasoning_content || delta?.reasoning || '';
+    const extractedDelta = extractContentAndThinking(delta?.content);
+    if (extractedDelta.text)
+        context.accumulatedText += extractedDelta.text;
+    const reasoning = (delta?.reasoning_content || delta?.reasoning || '') + extractedDelta.thinking;
     if (reasoning) {
         context.accumulatedReasoning += reasoning;
-        if (!completed)
+        if (!completed) {
+            const parts = [{ text: reasoning, thought: true }];
+            const pendingText = takeStreamText(context);
+            if (pendingText)
+                parts.push({ text: pendingText });
             return {
-                content: { parts: [{ text: reasoning, thought: true }], role: 'model' },
+                content: { parts, role: 'model' },
                 finishReason: 'OTHER',
                 index: 0,
             };
+        }
     }
     const completionParts = reasoning ? [{ text: reasoning, thought: true }] : [];
     // A complete invoke can precede a fragmented parallel invoke. Keep both until

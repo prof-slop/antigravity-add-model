@@ -101,12 +101,13 @@ describe('additive desktop integration', () => {
     expect(f.stop).toHaveBeenCalledTimes(1);
   });
 
-  it('strips content-security-policy and x-frame-options headers on received responses', async () => {
+  it('strips content-security-policy and x-frame-options headers case-insensitively on received responses', async () => {
     const f = await fixture();
     const result = f.receiveHeaders({
       'content-security-policy': ["default-src 'none'"],
+      'Content-Security-Policy': ["script-src 'self'"],
       'content-security-policy-report-only': ["default-src 'none'"],
-      'x-frame-options': ['DENY'],
+      'X-Frame-Options': ['DENY'],
       'content-type': ['text/html'],
     });
     expect(result).toEqual({

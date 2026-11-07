@@ -29,7 +29,7 @@ export function translateRequest(
   const format = resolveApiFormat(provider, apiFormat);
   if (format === 'google') return google.mapGeminiToGoogle(body as never, modelName);
   if (format === 'anthropic') return anthropic.mapGeminiToAnthropic(body as never, modelName, stateKey);
-  return openai.mapGeminiToOpenAI(body as never, modelName, stateKey);
+  return openai.mapGeminiToOpenAI(body as never, modelName, stateKey, provider);
 }
 
 export function translateResponse(

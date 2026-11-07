@@ -2,7 +2,7 @@ import type { GoogleCooldownReason } from './googlePoolPolicy';
 import { type GoogleAccessErrorCategory } from './googleAccessErrors';
 import { fetchGoogleUserInfo } from './googleOAuth';
 /** A consistent identifier for this application across Cloud Code account and generation requests. */
-export declare const GOOGLE_CLOUD_CODE_USER_AGENT = "antigravity-add-model";
+export declare const GOOGLE_CLOUD_CODE_USER_AGENT: string;
 export interface GoogleAccount {
     id: string;
     label?: string;
@@ -70,7 +70,7 @@ export declare class GoogleAccountError extends Error {
 }
 declare let persistAccount: ((modelName: string, account: GoogleAccount, previousAccount: GoogleAccount) => Promise<void> | void) | undefined;
 export declare function configureGoogleAccountPersistence(callback?: typeof persistAccount): void;
-export declare function quotaFamily(name: string): 'third-party' | 'gemini' | undefined;
+export declare function quotaFamily(name: string): 'argon' | 'third-party' | 'gemini' | undefined;
 /** Preserve local test/custom endpoints, and use the prepared tier for official Google requests. */
 export declare function googleAccountEndpoint(account: GoogleAccount, configured?: string): string;
 /** Refresh requests are coalesced and cached. Endpoint override is restricted to localhost fixtures. */

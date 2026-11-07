@@ -115,6 +115,12 @@ describe('native Google account failover', () => {
         Buffer.from('{"model":"claude-sonnet"}'),
       ),
     ).toBeUndefined();
+    const argonPool = { ...configured, externalModelName: 'gemini-4-argon-low' };
+    expect(resolveGoogleFailoverPool([argonPool], Buffer.from('{"model":"gemini-4-argon-medium"}'))).toBe(argonPool);
+    expect(resolveGoogleFailoverPool([argonPool], Buffer.from('{"model":"gemini-4-argon-high"}'))).toBe(argonPool);
+    const flashPool = { ...configured, externalModelName: 'gemini-3.8-flash-medium' };
+    expect(resolveGoogleFailoverPool([flashPool], Buffer.from('{"model":"gemini-3.8-flash-high"}'))).toBe(flashPool);
+    expect(resolveGoogleFailoverPool([flashPool], Buffer.from('{"model":"gemini-3.8-flash-tiered"}'))).toBe(flashPool);
   });
   it('recognizes only structured quota diagnoses for HTTP 400', () => {
     expect(isGoogleQuotaFailure(400, quotaError)).toBe(true);

@@ -128,14 +128,14 @@ interface OpenAIResponse {
 
 interface OpenAIChoice {
   message?: {
-    content: string;
+    content: string | unknown[] | null;
     reasoning_content?: string;
     reasoning?: string;
     tool_calls?: OpenAIToolCall[];
   };
   finish_reason?: string;
   delta?: {
-    content?: string;
+    content?: string | unknown[] | null;
     reasoning_content?: string;
     reasoning?: string;
     tool_calls?: OpenAIToolCallDelta[];
@@ -223,7 +223,7 @@ function compactContent(parts: OpenAIContentPart[]): string | OpenAIContentPart[
     : parts.map((part) => (part.type === 'text' ? part.text : '')).join('\n');
 }
 
-function mapAssistantMessage(parts: GeminiPart[]): OpenAIMessage {
+function mapAssistantMessage(parts: GeminiPart[], includeReasoningContent = true): OpenAIMessage {
   let content = '';
   let reasoning = '';
   for (const part of parts) {
@@ -231,7 +231,11 @@ function mapAssistantMessage(parts: GeminiPart[]): OpenAIMessage {
     else content += part.text || '';
   }
   // Replay reasoning from this history item for both ordinary and tool-call turns.
-  return { role: 'assistant', content, ...(reasoning ? { reasoning_content: reasoning } : {}) };
+  return {
+    role: 'assistant',
+    content,
+    ...(includeReasoningContent && reasoning ? { reasoning_content: reasoning } : {}),
+  };
 }
 
 function mapGeminiToolsToOpenAI(geminiTools: GeminiTool[]): OpenAITool[] {
@@ -260,7 +264,9 @@ export function mapGeminiToOpenAI(
   geminiBody: GeminiRequestBody,
   modelName: string,
   stateKey = modelName,
+  provider?: string,
 ): OpenAIRequestBody {
+  const omitReasoningContent = provider?.toLowerCase() === 'mistral';
   const messages: OpenAIMessage[] = [];
   const historyCallIds = new Map<string, string[]>();
   const pendingToolResponseContent: OpenAIContentPart[] = [];
@@ -311,7 +317,7 @@ export function mapGeminiToOpenAI(
               });
             }
           }
-          const message = mapAssistantMessage(item.parts);
+          const message = mapAssistantMessage(item.parts, !omitReasoningContent);
           message.content = message.content || null;
           message.tool_calls = toolCalls;
           messages.push(message);
@@ -341,7 +347,7 @@ export function mapGeminiToOpenAI(
         } else {
           const role = item.role === 'model' ? 'assistant' : item.role || 'user';
           if (role === 'assistant') {
-            messages.push(mapAssistantMessage(item.parts));
+            messages.push(mapAssistantMessage(item.parts, !omitReasoningContent));
           } else {
             messages.push({ role, content: compactContent(mapUserContentParts(item.parts)) });
           }
@@ -352,15 +358,17 @@ export function mapGeminiToOpenAI(
   // Keep feedback after all consecutive tool results, including split parallel responses.
   flushToolResponseContent();
 
-  // Inject reasoning_content into assistant messages missing it
-  let lastAssistantIdx = -1;
-  for (let i = 0; i < messages.length; i++) {
-    if (messages[i].role === 'assistant') lastAssistantIdx = i;
-  }
-  for (let i = 0; i < messages.length; i++) {
-    if (messages[i].role === 'assistant' && !(messages[i] as OpenAIMessage).reasoning_content) {
-      const preservedReasoning = modelReasoningContent.get(stateKey) || '';
-      messages[i].reasoning_content = i === lastAssistantIdx && preservedReasoning ? preservedReasoning : '';
+  // Inject reasoning_content into assistant messages missing it (skip for Mistral, which rejects extra fields with HTTP 422)
+  if (!omitReasoningContent) {
+    let lastAssistantIdx = -1;
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].role === 'assistant') lastAssistantIdx = i;
+    }
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].role === 'assistant' && !(messages[i] as OpenAIMessage).reasoning_content) {
+        const preservedReasoning = modelReasoningContent.get(stateKey) || '';
+        messages[i].reasoning_content = i === lastAssistantIdx && preservedReasoning ? preservedReasoning : '';
+      }
     }
   }
 
@@ -437,13 +445,45 @@ function parseDSMLToolCalls(text: string): DSMLParsedResult | null {
   }
 }
 
+function extractContentAndThinking(rawContent: unknown): { text: string; thinking: string } {
+  if (typeof rawContent === 'string') return { text: rawContent, thinking: '' };
+  if (!Array.isArray(rawContent)) return { text: '', thinking: '' };
+  let text = '';
+  let thinking = '';
+  for (const item of rawContent) {
+    if (!item || typeof item !== 'object') continue;
+    const block = item as Record<string, unknown>;
+    if (block.type === 'thinking') {
+      if (typeof block.thinking === 'string') {
+        thinking += block.thinking;
+      } else if (Array.isArray(block.thinking)) {
+        for (const sub of block.thinking) {
+          if (sub && typeof sub === 'object' && typeof (sub as Record<string, unknown>).text === 'string') {
+            thinking += (sub as Record<string, unknown>).text as string;
+          }
+        }
+      } else if (typeof block.text === 'string') {
+        thinking += block.text;
+      }
+    } else if (block.type === 'reasoning') {
+      if (typeof block.reasoning === 'string') thinking += block.reasoning;
+      else if (typeof block.text === 'string') thinking += block.text;
+    } else if (typeof block.text === 'string') {
+      text += block.text;
+    }
+  }
+  return { text, thinking };
+}
+
 export function mapOpenAIToGemini(
   openAiRes: OpenAIResponse,
   modelName: string,
   toolSchemas?: ToolSchemas,
 ): GeminiGenerateContentResponse {
   const choice = openAiRes.choices?.[0];
-  const reasoning = choice?.message?.reasoning_content || choice?.message?.reasoning || '';
+  const extracted = extractContentAndThinking(choice?.message?.content);
+  const reasoning = (choice?.message?.reasoning_content || choice?.message?.reasoning || '') + extracted.thinking;
+  const text = extracted.text;
 
   if (choice?.message?.tool_calls && choice.message.tool_calls.length > 0) {
     const parts: GeminiPart[] = choice.message.tool_calls.map((tc) => {
@@ -475,7 +515,7 @@ export function mapOpenAIToGemini(
       }
       return { functionCall: { name: translated.name, args: translated.args as Record<string, unknown>, id: tc.id } };
     });
-    if (choice.message.content) parts.unshift({ text: choice.message.content });
+    if (text) parts.unshift({ text });
     if (reasoning) parts.unshift({ text: reasoning, thought: true });
     return {
       candidates: [{ content: { parts, role: 'model' }, finishReason: 'STOP', index: 0 }],
@@ -487,7 +527,6 @@ export function mapOpenAIToGemini(
     };
   }
 
-  const text = choice?.message?.content || '';
   const dsml = parseDSMLToolCalls(text);
   if (dsml && dsml.functionCalls.length > 0) {
     const parts: GeminiPart[] = dsml.functionCalls.map((fc) => {
@@ -575,16 +614,21 @@ export function mapOpenAIChunkToGemini(
 
   const finishReason = choice.finish_reason;
   const completed = finishReason === 'stop' || finishReason === 'length' || finishReason === 'tool_calls';
-  if (delta?.content) context.accumulatedText += delta.content;
-  const reasoning = delta?.reasoning_content || delta?.reasoning || '';
+  const extractedDelta = extractContentAndThinking(delta?.content);
+  if (extractedDelta.text) context.accumulatedText += extractedDelta.text;
+  const reasoning = (delta?.reasoning_content || delta?.reasoning || '') + extractedDelta.thinking;
   if (reasoning) {
     context.accumulatedReasoning += reasoning;
-    if (!completed)
+    if (!completed) {
+      const parts: GeminiPart[] = [{ text: reasoning, thought: true }];
+      const pendingText = takeStreamText(context);
+      if (pendingText) parts.push({ text: pendingText });
       return {
-        content: { parts: [{ text: reasoning, thought: true }], role: 'model' },
+        content: { parts, role: 'model' },
         finishReason: 'OTHER',
         index: 0,
       };
+    }
   }
   const completionParts: GeminiPart[] = reasoning ? [{ text: reasoning, thought: true }] : [];
   // A complete invoke can precede a fragmented parallel invoke. Keep both until

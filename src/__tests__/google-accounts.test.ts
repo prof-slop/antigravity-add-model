@@ -187,7 +187,7 @@ describe('Google account selection and quota', () => {
     let receivedUserAgent: string | undefined;
     const endpoint = await serve((req, res) => {
       receivedUserAgent = req.headers['user-agent'];
-      if (receivedUserAgent !== 'antigravity-add-model') {
+      if (receivedUserAgent !== GOOGLE_CLOUD_CODE_USER_AGENT) {
         res.writeHead(403);
         res.end('{}');
         return;
@@ -200,7 +200,7 @@ describe('Google account selection and quota', () => {
         ),
       );
     });
-    expect(GOOGLE_CLOUD_CODE_USER_AGENT).toBe('antigravity-add-model');
+    expect(GOOGLE_CLOUD_CODE_USER_AGENT).toContain('antigravity/hub/2.29.0');
     if (kind === 'quota')
       await expect(fetchGoogleQuota(account('user-agent'), endpoint)).resolves.toMatchObject({
         buckets: [{ id: 'fixture', remainingFraction: 1 }],

@@ -102,14 +102,14 @@ interface OpenAIResponse {
 }
 interface OpenAIChoice {
     message?: {
-        content: string;
+        content: string | unknown[] | null;
         reasoning_content?: string;
         reasoning?: string;
         tool_calls?: OpenAIToolCall[];
     };
     finish_reason?: string;
     delta?: {
-        content?: string;
+        content?: string | unknown[] | null;
         reasoning_content?: string;
         reasoning?: string;
         tool_calls?: OpenAIToolCallDelta[];
@@ -141,7 +141,7 @@ interface GeminiUsageMetadata {
     totalTokenCount: number;
 }
 declare function mapGeminiToolsToOpenAI(geminiTools: GeminiTool[]): OpenAITool[];
-export declare function mapGeminiToOpenAI(geminiBody: GeminiRequestBody, modelName: string, stateKey?: string): OpenAIRequestBody;
+export declare function mapGeminiToOpenAI(geminiBody: GeminiRequestBody, modelName: string, stateKey?: string, provider?: string): OpenAIRequestBody;
 export declare function mapOpenAIToGemini(openAiRes: OpenAIResponse, modelName: string, toolSchemas?: ToolSchemas): GeminiGenerateContentResponse;
 export declare function mapOpenAIChunkToGemini(chunk: OpenAIResponse, modelName: string, streamKey?: string, toolSchemas?: ToolSchemas): GeminiCandidate | null;
 export { mapGeminiToolsToOpenAI };

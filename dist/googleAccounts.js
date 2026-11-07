@@ -52,7 +52,7 @@ const googleAccessErrors_1 = require("./googleAccessErrors");
 const googleOAuth_1 = require("./googleOAuth");
 const shared_1 = require("./proxy/shared");
 /** A consistent identifier for this application across Cloud Code account and generation requests. */
-exports.GOOGLE_CLOUD_CODE_USER_AGENT = 'antigravity-add-model';
+exports.GOOGLE_CLOUD_CODE_USER_AGENT = `antigravity-add-model antigravity/hub/2.29.0 (os_type=${process.platform}; arch=${process.arch}; aidev_client)`;
 class GoogleAccountError extends Error {
     constructor(message, status = 503) {
         super(message);
@@ -115,11 +115,13 @@ function quotaIsFresh(quota, now = Date.now()) {
         !quota.buckets.some((bucket) => bucket.resetTime && Date.parse(bucket.resetTime) <= now));
 }
 function quotaFamily(name) {
-    return /claude|gpt|anthropic|openai|third[- ]?party/i.test(name)
-        ? 'third-party'
-        : /gemini|google/i.test(name)
-            ? 'gemini'
-            : undefined;
+    return /argon/i.test(name)
+        ? 'argon'
+        : /claude|gpt|anthropic|openai|third[- ]?party|\b3p\b/i.test(name)
+            ? 'third-party'
+            : /gemini|google/i.test(name)
+                ? 'gemini'
+                : undefined;
 }
 function quotaBuckets(quota, upstreamModel) {
     const wanted = upstreamModel ? quotaFamily(upstreamModel) : undefined;
@@ -129,9 +131,10 @@ function quotaBuckets(quota, upstreamModel) {
         bucket,
         family: quotaFamily(`${bucket.groupName || ''} ${bucket.id} ${bucket.displayName || ''}`),
     }));
+    const target = wanted === 'argon' && !classified.some((entry) => entry.family === 'argon') ? 'gemini' : wanted;
     // Missing family information is unknown eligibility, not proof that the account lacks access.
     return classified.some((entry) => entry.family)
-        ? classified.filter((entry) => entry.family === wanted).map((entry) => entry.bucket)
+        ? classified.filter((entry) => entry.family === target).map((entry) => entry.bucket)
         : quota.buckets;
 }
 function quotaScope(account, endpoint, project = account.project) {

@@ -76,6 +76,8 @@ describe('main-world CSP & sandbox interception invariants', () => {
       Element,
       DOMTokenList,
       MutationObserver,
+      WeakSet,
+      Set,
       console,
     });
 
@@ -95,34 +97,68 @@ describe('main-world CSP & sandbox interception invariants', () => {
         Element: window.Element,
         DOMTokenList: window.DOMTokenList,
         MutationObserver: window.MutationObserver,
+        WeakSet,
+        Set,
       });
     }).not.toThrow();
   });
 
-  it('CSP-01 & CSP-02: sanitizes sandbox on setAttribute to guarantee scripts and strip same-origin', () => {
+  it('CSP-01 & CSP-02: sanitizes sandbox on setAttribute to guarantee scripts and strip forbidden tokens', () => {
     const { document } = createDOMHarness();
     const iframe = document.createElement('iframe');
     document.body.appendChild(iframe);
 
-    // Default or empty sandbox should sanitize to SAFE_SANDBOX
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
     expect(iframe.getAttribute('sandbox')).not.toContain('allow-same-origin');
     expect(iframe.getAttribute('sandbox')).toContain('allow-scripts');
 
-    iframe.setAttribute('sandbox', 'allow-popups-to-escape-sandbox allow-forms');
+    iframe.setAttribute('sandbox', 'allow-popups-to-escape-sandbox allow-top-navigation allow-forms');
     expect(iframe.getAttribute('sandbox')).not.toContain('allow-popups-to-escape-sandbox');
+    expect(iframe.getAttribute('sandbox')).not.toContain('allow-top-navigation');
     expect(iframe.getAttribute('sandbox')).toContain('allow-scripts');
     expect(iframe.getAttribute('sandbox')).toContain('allow-forms');
   });
 
-  it('CSP-01: prevents removal of sandbox attribute to preserve sandbox protection', () => {
+  it('CSP-01 & CSP-07: prevents removal of sandbox attribute on artifact iframes while leaving non-artifact iframes untouched', () => {
     const { document } = createDOMHarness();
-    const iframe = document.createElement('iframe');
-    document.body.appendChild(iframe);
+    const artifactIframe = document.createElement('iframe');
+    artifactIframe.setAttribute('srcdoc', '<div>Artifact</div>');
+    document.body.appendChild(artifactIframe);
 
-    iframe.setAttribute('sandbox', 'allow-scripts');
-    iframe.removeAttribute('sandbox');
-    expect(iframe.getAttribute('sandbox')).toBe('allow-scripts allow-forms allow-downloads allow-modals');
+    artifactIframe.removeAttribute('sandbox');
+    expect(artifactIframe.getAttribute('sandbox')).toBe('allow-scripts allow-forms allow-downloads allow-modals');
+
+    const internalIframe = document.createElement('iframe');
+    internalIframe.setAttribute('src', 'https://example.com');
+    document.body.appendChild(internalIframe);
+    expect(internalIframe.getAttribute('sandbox')).toBeNull();
+  });
+
+  it('CSP-07: does not pollute element.classList.value or classList.add on regular DOM elements', () => {
+    const { document } = createDOMHarness();
+    const div = document.createElement('div');
+    div.classList.value = 'agy-row agy-primary';
+    expect(div.className).toBe('agy-row agy-primary');
+    div.classList.add('active');
+    expect(div.className).toBe('agy-row agy-primary active');
+  });
+
+  it('REDUN-03: filters forbidden sandbox tokens from DOMTokenList.prototype.add', () => {
+    const { document } = createDOMHarness();
+    const div = document.createElement('div');
+    div.classList.add('allow-scripts', 'allow-same-origin', 'allow-popups-to-escape-sandbox', 'allow-top-navigation');
+    expect(div.classList.contains('allow-scripts')).toBe(true);
+    expect(div.classList.contains('allow-same-origin')).toBe(false);
+    expect(div.classList.contains('allow-popups-to-escape-sandbox')).toBe(false);
+    expect(div.classList.contains('allow-top-navigation')).toBe(false);
+  });
+
+  it('SEC-16: rewrites CSP inside iframe strings assigned via innerHTML and insertAdjacentHTML', () => {
+    const { document } = createDOMHarness();
+    const container = document.createElement('div');
+    container.innerHTML =
+      '<iframe srcdoc="<meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src \'none\'&quot;>"></iframe>';
+    expect(container.innerHTML).toContain('data-ag-csp=');
   });
 
   it('CSP-03: rewrites restrictive Content-Security-Policy meta tag in srcdoc', () => {

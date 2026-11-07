@@ -14,7 +14,8 @@ import {
 } from './proxy/shared';
 
 /** A consistent identifier for this application across Cloud Code account and generation requests. */
-export const GOOGLE_CLOUD_CODE_USER_AGENT = 'antigravity-add-model';
+export const GOOGLE_CLOUD_CODE_USER_AGENT =
+  `antigravity-add-model antigravity/hub/2.29.0 (os_type=${process.platform}; arch=${process.arch}; aidev_client)`;
 
 export interface GoogleAccount {
   id: string;
@@ -162,12 +163,14 @@ function quotaIsFresh(quota?: GoogleQuotaSnapshot, now = Date.now()): boolean {
     !quota.buckets.some((bucket) => bucket.resetTime && Date.parse(bucket.resetTime) <= now)
   );
 }
-export function quotaFamily(name: string): 'third-party' | 'gemini' | undefined {
-  return /claude|gpt|anthropic|openai|third[- ]?party/i.test(name)
-    ? 'third-party'
-    : /gemini|google/i.test(name)
-      ? 'gemini'
-      : undefined;
+export function quotaFamily(name: string): 'argon' | 'third-party' | 'gemini' | undefined {
+  return /argon/i.test(name)
+    ? 'argon'
+    : /claude|gpt|anthropic|openai|third[- ]?party|\b3p\b/i.test(name)
+      ? 'third-party'
+      : /gemini|google/i.test(name)
+        ? 'gemini'
+        : undefined;
 }
 function quotaBuckets(quota: GoogleQuotaSnapshot, upstreamModel?: string): GoogleQuotaBucket[] {
   const wanted = upstreamModel ? quotaFamily(upstreamModel) : undefined;
@@ -176,9 +179,11 @@ function quotaBuckets(quota: GoogleQuotaSnapshot, upstreamModel?: string): Googl
     bucket,
     family: quotaFamily(`${bucket.groupName || ''} ${bucket.id} ${bucket.displayName || ''}`),
   }));
+  const target =
+    wanted === 'argon' && !classified.some((entry) => entry.family === 'argon') ? 'gemini' : wanted;
   // Missing family information is unknown eligibility, not proof that the account lacks access.
   return classified.some((entry) => entry.family)
-    ? classified.filter((entry) => entry.family === wanted).map((entry) => entry.bucket)
+    ? classified.filter((entry) => entry.family === target).map((entry) => entry.bucket)
     : quota.buckets;
 }
 function quotaScope(account: GoogleAccount, endpoint?: string, project = account.project): OfficialQuotaScope {
@@ -421,7 +426,7 @@ export async function fetchGoogleQuota(
   endpoint.search = '';
   const current = await refreshGoogleAccount(account);
   const measuredAt = Date.now();
-  const authHeaders = {
+  const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${current.accessToken}`,
     'User-Agent': GOOGLE_CLOUD_CODE_USER_AGENT,
@@ -440,7 +445,7 @@ export async function fetchGoogleQuota(
   // A native observation arriving during this request can be newer than our measurement.
   if (observed && observed.checkedAt > measuredAt) data = { ...data, ...observed.data };
   const checkedAt = Math.max(measuredAt, observed?.checkedAt ?? 0);
-  const familyOf = (value: unknown): 'third-party' | 'gemini' | undefined => {
+  const familyOf = (value: unknown): 'argon' | 'third-party' | 'gemini' | undefined => {
     if (!value || typeof value !== 'object') return undefined;
     const item = value as Record<string, unknown>;
     return quotaFamily(

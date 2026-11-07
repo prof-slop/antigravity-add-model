@@ -567,4 +567,72 @@ describe('subagent routing at the common Gemini boundary', () => {
     const repeated = bridge.rewriteCandidate(candidate(['custom-a'], 'call-1'), context, resolve);
     expect(repeated).toEqual(first);
   });
+
+  it('supports flat invoke_subagent tool declarations, tool calls, and history restoration', () => {
+    const bridge = new SubagentRoutingBridge();
+    const flatSchema = {
+      type: 'object',
+      properties: {
+        TypeName: { type: 'string' },
+        Role: { type: 'string' },
+        Prompt: { type: 'string' },
+        Model: { type: 'string', enum: ['inherit', 'flash_lite', 'flash', 'pro'] },
+      },
+      required: ['TypeName', 'Role', 'Prompt'],
+    };
+    const parentBody: GeminiBody = {
+      ...parent('flat-parent'),
+      tools: [{ functionDeclarations: [{ name: 'invoke_subagent', parameters: flatSchema }] }],
+    };
+    const preparedParent = bridge.prepareRequest(parentBody, resolve);
+    const relaxed = (preparedParent.body.tools as { functionDeclarations: { parameters: typeof flatSchema }[] }[])[0]
+      .functionDeclarations[0].parameters;
+    expect(relaxed.properties.Model.enum).toBeUndefined();
+    expect((relaxed.properties.Model as { description?: string }).description).toContain('exact saved name');
+
+    const flatCandidate = {
+      content: {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              id: 'flat-call-1',
+              name: 'invoke_subagent',
+              args: {
+                TypeName: 'research',
+                Role: 'Codebase Researcher',
+                Prompt: 'Investigate flat schema',
+                Model: 'custom-a',
+              },
+            },
+          },
+        ],
+      },
+    };
+    const rewritten = bridge.rewriteCandidate(flatCandidate, preparedParent.context, resolve);
+    const rewrittenArgs = rewritten.content.parts[0].functionCall.args;
+    expect(rewrittenArgs.Model).toBe('inherit');
+    expect(rewrittenArgs.Prompt).toMatch(/^Investigate flat schema\n\n\[antigravity-subagent-route:[0-9a-f-]{36}\]$/);
+
+    // Child first request routes to custom-a and strips the marker
+    const childTurn1 = bridge.prepareRequest(child(rewrittenArgs.Prompt, 'flat-child'), resolve);
+    expect(childTurn1.modelName).toBe('custom-a');
+    expect(childTurn1.body.contents[0].parts[0].text).toBe('Investigate flat schema');
+
+    // Child second turn stays bound to custom-a
+    expect(bridge.prepareRequest(child('Follow-up turn', 'flat-child'), resolve).modelName).toBe('custom-a');
+
+    // Parent history replay restores original Model and strips marker from flat args
+    const replay = bridge.prepareRequest(
+      history(rewritten as unknown as Candidate, { conversationId: 'flat-child' }, 'flat-parent', 'flat-call-1'),
+      resolve,
+    );
+    const restoredCall = replay.body.contents[1].parts[0].functionCall as { args: Record<string, unknown> };
+    expect(restoredCall.args).toEqual({
+      TypeName: 'research',
+      Role: 'Codebase Researcher',
+      Prompt: 'Investigate flat schema',
+      Model: 'custom-a',
+    });
+  });
 });

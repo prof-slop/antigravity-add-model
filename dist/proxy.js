@@ -157,8 +157,14 @@ function matchCustomModel(models, ...selectors) {
                 selector === identity.placeholderValue));
     });
 }
+function isNativeFailoverPoolOnly(model) {
+    return model.provider === 'google-cloudcode' && model.googlePool?.nativeFailoverEnabled === true;
+}
+function selectorCustomModels() {
+    return loadCustomModels().filter((model) => !isNativeFailoverPoolOnly(model));
+}
 function customCloudCodeCatalog(upstream = {}) {
-    const models = loadCustomModels();
+    const models = selectorCustomModels();
     const identities = modelIdentities(models, upstream);
     const labels = (0, modelCatalog_1.catalogDisplayNames)(models, upstream);
     return (0, modelCatalog_1.mergeCloudCodeCatalog)(upstream, models
@@ -609,8 +615,9 @@ function forwardToGoogle(req, res, reqBody, nativeSubagent, cloudCodeOrigin) {
         }
         failForwarding(502, 'Proxy forwarding failed: ' + err.message);
     });
-    proxyReq.setTimeout(60000, () => {
-        electron_log_1.default.error('[Proxy] Google proxy request timed out after 60s');
+    const forwardIdleTimeoutMs = isGeneration ? 300000 : 60000;
+    proxyReq.setTimeout(forwardIdleTimeoutMs, () => {
+        electron_log_1.default.error(`[Proxy] Google proxy request timed out after ${Math.round(forwardIdleTimeoutMs / 1000)}s`);
         if (nativeResponse)
             nativeResponse.destroy(new Error('Google API request timed out'));
         else
@@ -879,7 +886,7 @@ function handleGetAvailableModelsProxy(res, reqBody, lsUrl) {
         lsRes.on('data', (chunk) => chunks.push(chunk));
         lsRes.on('end', () => {
             const responseBuf = Buffer.concat(chunks);
-            const customModels = loadCustomModels();
+            const customModels = selectorCustomModels();
             const identities = modelIdentities(customModels);
             let modifiedBuf = responseBuf;
             if (customModels.length > 0 && responseBuf.length > 6) {
@@ -1119,7 +1126,7 @@ function handleRequest(req, res) {
                     electron_log_1.default.error('[Proxy] Models list forward request timed out');
                     googleReq.destroy();
                     if (!res.headersSent) {
-                        const customModels = loadCustomModels();
+                        const customModels = selectorCustomModels();
                         res.writeHead(200, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify({
                             models: customModels.map((m) => ({
@@ -1137,7 +1144,7 @@ function handleRequest(req, res) {
                 googleRes.on('end', () => {
                     try {
                         const googleJson = JSON.parse(googleBody);
-                        const customModels = loadCustomModels();
+                        const customModels = selectorCustomModels();
                         const mappedCustom = customModels.map((m) => ({
                             name: m.name,
                             version: '1.0',
@@ -1162,7 +1169,7 @@ function handleRequest(req, res) {
                     }
                     catch (err) {
                         electron_log_1.default.error('[Proxy] Google list models failed, returning custom models list only:', err);
-                        const customModels = loadCustomModels();
+                        const customModels = selectorCustomModels();
                         const mappedCustom = customModels.map((m) => ({
                             name: m.name,
                             version: '1.0',
@@ -1182,7 +1189,7 @@ function handleRequest(req, res) {
                 if (stoppingProxy || res.destroyed || res.writableEnded || res.socket?.destroyed)
                     return;
                 electron_log_1.default.error('[Proxy] Google models list request error:', err);
-                const customModels = loadCustomModels();
+                const customModels = selectorCustomModels();
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     models: customModels.map((m) => ({

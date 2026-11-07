@@ -26,8 +26,8 @@ function boundedWorkerModel(selected: CustomModel): CustomModel {
     ...selected,
     fallbackModels: [],
     maxRetries: 0,
-    timeout: Math.min(selected.timeout ?? 120000, 120000),
-    retryBudgetMs: Math.min(selected.retryBudgetMs ?? 120000, 120000),
+    timeout: Math.min(selected.timeout ?? 600000, 600000),
+    retryBudgetMs: Math.min(selected.retryBudgetMs ?? 600000, 600000),
     maxOutputTokens,
     ...(selected.thinkingBudget === undefined ? {} : { thinkingBudget: budget(selected.thinkingBudget) }),
   };
