@@ -2,15 +2,15 @@
   <img src="gateway/dashboard/antigravity-logo.png" width="96" height="96" alt="Google Antigravity logo">
 </p>
 
-<h1 align="center">Antigravity Custom Model Enabler</h1>
+<h1 align="center">Antigravity Custom Model Enabler — 增强版分支 (Enhanced Fork)</h1>
 
 <p align="center">
-  <strong>属于你的服务商。属于你的本地模型。无缝集成于 Antigravity。</strong><br>
-  适用于桌面端应用、Antigravity IDE 以及可选网关的模型管理工具。
+  <strong>属于你的服务商。属于你的本地模型。交互式生成式 UI。零干扰的账号池故障转移。</strong><br>
+  适用于桌面端应用、Antigravity IDE 以及可选网关的高级模型路由、多账号配额自动故障转移与富交互组件渲染。
 </p>
 
 <p align="center">
-  <a href="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="#安装指南"><img src="https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=nodedotjs&logoColor=white" alt="Node.js 22.13 or newer"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-2563eb" alt="Apache License 2.0"></a>
 </p>
@@ -20,19 +20,35 @@
 </p>
 
 <p align="center">
-  <a href="#安装指南"><strong>快速开始</strong></a> ·
+  <a href="#本分支新增特性"><strong>本分支新增特性</strong></a> ·
+  <a href="#生成式-ui-与-csp-解锁演示">生成式 UI 演示</a> ·
+  <a href="#安装指南">快速开始</a> ·
   <a href="#快速链接">快速链接</a> ·
-  <a href="#界面截图">界面截图</a> ·
-  <a href="#文档指南">文档指南</a> ·
-  <a href="https://github.com/vahapogut/antigravity-add-model/issues/new">提交问题 (Issue)</a>
+  <a href="#与上游仓库同步">与上游仓库同步</a> ·
+  <a href="https://github.com/prof-slop/antigravity-add-model/issues/new">提交问题 (Issue)</a>
 </p>
 
 ---
 
-在 Antigravity 内置模型的基础上，无缝添加外部 API 服务商与本地模型。你可以在设置（Settings）中完成配置，直接在对话模型选择器中切换模型，还可以按需通过网关（Gateway）路由请求，从而获得请求历史记录、备用服务商回退（Fallback）以及可视化浏览器控制台等功能。
+在 Antigravity 内置模型的基础上，无缝添加外部 API 服务商、本地模型与多账号 Google Cloud Code 配额池。你可以在设置（Settings）中完成配置，直接在对话模型选择器中切换模型，在聊天流中内联渲染交互式 HTML/WebGL 组件，还可以按需通过网关（Gateway）路由请求，从而获得请求历史记录、备用服务商回退（Fallback）以及可视化浏览器控制台等功能。
 
 > [!IMPORTANT]
-> **独立的 Electron 桌面端应用**请使用下方的增量安装程序。独立的**基于 VS Code 的 Antigravity IDE** 则使用专属的[设置适配器与本地 Web 管理器](docs/ide.md)。Windows 版 IDE **2.5.5** 的登录、原生模型选择及流式对话功能已通过本地 OpenAI 兼容服务商完成验证；详情请参阅[验证结果说明](docs/ide.md#validation-boundary)。自定义模型路由适用于本地会话，官方原有的 WSL 路由逻辑保持不变。安装前请先查阅[兼容性说明](docs/compatibility.md)。
+> **独立的 Electron 桌面端应用**请使用下方的增量安装程序。独立的**基于 VS Code 的 Antigravity IDE** 则使用专属的[设置适配器与本地 Web 管理器](docs/ide.md)。安装前请先查阅[兼容性说明](docs/compatibility.md)。
+
+---
+
+## 本分支新增特性
+
+本仓库（`prof-slop/antigravity-add-model`）基于 [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) 构建，针对重度开发者增加了以下核心增强：
+
+| 增强特性 | 功能说明 |
+| --- | --- |
+| **生成式 UI 与沙箱解锁 (`cspPreload` + [`skills/generative_ui`](skills/generative_ui/SKILL.md))** | 放宽内容安全策略（`script-src`、`style-src`、`font-src`、`connect-src`、`worker-src`）并自动升级受限的 `<iframe>` 沙箱属性（`allow-scripts allow-forms allow-downloads allow-modals`）。支持在 Antigravity 对话中直接加载外部公共 CDN 并渲染交互式 3D WebGL（`Three.js`）、数学绘图（`JSXGraph`、`Plotly.js`）、`KaTeX`、`D3` 以及 `Chart.js + jStat`。仓库内置可选的 [`generative_ui` 技能包](skills/generative_ui/SKILL.md)以发挥最佳渲染效果。 |
+| **全系列原生 Google 账号池故障转移** | 单个启用了 **Native Failover** 的 `google-cloudcode` 账号池会自动覆盖同一模型家族下的**所有推理强度变体**（`low`、`medium`、`high`、`xhigh`、`tiered`、`thinking` —— 如 `gemini-4-argon-low/medium/high` 或 `gemini-3.8-flash-low/medium/high/tiered`），在主账号触发 `429` 配额限制时无缝切流。 |
+| **零干扰模型选择器** | 仅用于后台 **Native Failover** 的 Google Cloud Code 账号池会自动从聊天模型下拉选择器中隐藏，保持下拉菜单清爽，同时在后台保持激活并可在 **Settings → Custom Models** 中管理。 |
+| **长流式传输心跳保活与工具调用容错** | 在缓冲大型流式工具调用参数（例如 OpenRouter 上高推理模型生成的 40 KB `write_file` 载荷）期间，每 5 秒向下游发送 `: keepalive` SSE 心跳，并将流式超时预算延长至 15 分钟，防止慢速 FP4/思考端点中途断连。 |
+| **多轮工具调用推理保留与子代理路由** | 在兼容 OpenAI 的多轮工具调用及自定义 `invoke_subagent` 路由（`$model`、`customModelId`）中完整保留 `reasoning_content` / `<thinking>` 思考链。 |
+| **零硬编码密钥的强化版 OAuth 提取** | 源码与 `dist/` 中均不包含任何硬编码 `GOCSPX-` 密钥。运行时通过不可逆的 64 位 SHA-256 配对指纹（`6f5c1920f8566f36`）及序号回退机制直接从本地 `language_server` 二进制文件中提取个人 OAuth 凭据，并动态适配 `process.platform` / `process.arch` User-Agent。 |
 
 ## 快速链接
 
@@ -65,6 +81,39 @@
 安装程序会完整保留已安装应用的原生运行时，仅注入经过校验的钩子（Hooks）。它会按版本保留独立备份，并在部署失败时自动回滚。有关实现细节与功能范围，请参阅[功能特性对比](docs/feature-parity.md)。
 
 ## 界面截图
+
+### 生成式 UI 与 CSP 解锁演示
+
+启用 [`src/cspPreload.ts`](src/cspPreload.ts) 后，Antigravity 的 `<agent-embed>` 内联框架能够在保障宿主沙箱隔离的前提下，直接从公共 CDN 加载科学计算、图形学与 3D WebGL 引擎（**Three.js**、**Plotly.js**、**JSXGraph**、**D3.js**、**Mermaid**、**Chart.js + jStat** 与 **KaTeX**）：
+
+<p align="center">
+  <a href="assets/showcase_distributions_dark.png">
+    <img src="assets/showcase_distributions_dark.png" width="1000" alt="在 Antigravity 对话流中内联渲染的 Chart.js + jStat 交互式高斯混合分布图表">
+  </a>
+  <br>
+  <em><strong>交互式统计分布看板 (Chart.js + jStat)</strong> — 在对话流中通过 <code>sigma</code> 滑块实时驱动零闪烁的数据集原地更新。</em>
+</p>
+
+| **D3.js 力导向引擎拓扑图（暗色模式）** | **Three.js 3D WebGL 流形（亮色模式）** |
+| :---: | :---: |
+| <a href="assets/showcase_d3_graph_dark.png"><img src="assets/showcase_d3_graph_dark.png" width="490" alt="Antigravity 内联渲染的 D3.js 可拖拽节点力导向仿真"></a> | <a href="assets/showcase_threejs_light.png"><img src="assets/showcase_threejs_light.png" width="490" alt="亮色主题下的 Three.js WebGL 环面纽结流形与 900 粒子群"></a> |
+| *支持拖拽节点的交互式物理力导向布局（`d3@7`）。* | *实时 WebGL 环面纽结流形 + 900 粒子群（`three@0.160.0`），支持明暗主题无缝切换。* |
+
+> [!TIP]
+> **推荐使用内置技能包以获得最佳效果（可选）：** 尽管 [`src/cspPreload.ts`](src/cspPreload.ts) 已在运行时底层解锁了外部 CDN 与 iframe 脚本执行，但 Antigravity 默认的内置提示词仍倾向于回退到保守的静态 SVG 或字符画。
+>
+> 为获得最佳开箱体验，建议安装项目附带的 [`skills/generative_ui`](skills/generative_ui/SKILL.md) 技能包（包含完整的 CDN 路由矩阵、`requestAnimationFrame` 零闪烁更新规范、`<430px` 无滚动条卡片布局以及无头截图脚本）。该技能包**完全可选**——你可以直接使用、按需修改，或编写自己的技能包：
+> ```sh
+> # 全局安装（对所有工作区生效，推荐）：
+> mkdir -p ~/.gemini/config/skills
+> cp -R skills/generative_ui ~/.gemini/config/skills/generative_ui
+>
+> # 或仅针对当前工作区安装：
+> mkdir -p .agents/skills
+> cp -R skills/generative_ui .agents/skills/generative_ui
+> ```
+
+---
 
 ### 模型管理器 (Model management)
 
@@ -120,7 +169,7 @@
 你需要安装**独立的 Antigravity 桌面端应用**、Git 以及 **Node.js 22.13 或更高版本**。该 Node 版本同时支持桌面端插件和可选网关。
 
 ```sh
-git clone https://github.com/vahapogut/antigravity-add-model.git
+git clone https://github.com/prof-slop/antigravity-add-model.git
 cd antigravity-add-model
 npm ci --ignore-scripts
 npm run build
@@ -275,7 +324,26 @@ flowchart LR
     Dashboard["Web 控制台 + 历史记录"] --- Gateway
 ```
 
-本插件在保留官方原生运行时的前提下增量注入设置界面控件。可选网关则作为独立的 Node.js 进程运行，并使用其专属的数据目录。
+本插件在保留官方原生运行时的前提下增量注入 `customPreload` 与 `cspPreload`。可选网关则作为独立的 Node.js 进程运行，并使用其专属的数据目录。
+
+## 与上游仓库同步
+
+本分支将 [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) 作为 `upstream` 跟踪，同时在 `main` 分支上维护自定义增强功能。当上游发布新版本时，可通过以下流程同步更新并保留本分支特性：
+
+```sh
+# 1. 首次添加 upstream 远程仓库（如尚未添加）
+git remote add upstream https://github.com/vahapogut/antigravity-add-model.git
+
+# 2. 拉取上游更新并将本分支提交变基（rebase）到 upstream/main 之上
+git fetch upstream
+git rebase upstream/main
+
+# 3. 重新编译 dist/、运行测试并重新部署到 Antigravity
+npm run build && npm test && node scripts/deploy.mjs
+
+# 4. 推送更新后的分支到个人远程库
+git push --force-with-lease origin main
+```
 
 ## 更新、诊断与恢复
 
@@ -355,6 +423,6 @@ CI 自动化测试基于本地模拟服务商数据（Fixtures）和隔离安装
 
 Antigravity 徽标来自 [Google 官方媒体资源库](https://antigravity.google/press)。
 
-由 **[vahapogut](https://github.com/vahapogut)** 维护 · [LinkedIn](https://www.linkedin.com/in/abdulvahap-ogut-343992398/)
+本分支由 **[prof-slop](https://github.com/prof-slop/antigravity-add-model)** 维护 · 上游项目由 **[vahapogut](https://github.com/vahapogut/antigravity-add-model)** 维护
 
 <p align="center"><a href="#快速链接">↑ 返回快速链接</a></p>

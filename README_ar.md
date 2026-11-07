@@ -4,15 +4,15 @@
   <img src="gateway/dashboard/antigravity-logo.png" width="96" height="96" alt="شعار Google Antigravity">
 </p>
 
-<h1 align="center">تمكين النماذج المخصصة في Antigravity</h1>
+<h1 align="center">تمكين النماذج المخصصة في Antigravity — نسخة مطوّرة (Enhanced Fork)</h1>
 
 <p align="center">
-  <strong>مزودوك ونماذجك المحلية، داخل Antigravity.</strong><br>
-  إدارة النماذج لتطبيق سطح المكتب وAntigravity IDE، مع بوابة اختيارية.
+  <strong>مزودوك. نماذجك المحلية. واجهة تفاعلية توليدية (Generative UI). تبديل احتياطي سلس للحسابات.</strong><br>
+  توجيه متقدم للنماذج، وتبديل تلقائي للحصص متعددة الحسابات، وعرض عناصر تفاعلية غنية لتطبيق سطح المكتب وAntigravity IDE والبوابة الاختيارية.
 </p>
 
 <p align="center">
-  <a href="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="التكامل المستمر CI"></a>
+  <a href="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="التكامل المستمر CI"></a>
   <a href="#installation"><img src="https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=nodedotjs&logoColor=white" alt="Node.js 22.13 أو أحدث"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-2563eb" alt="ترخيص Apache 2.0"></a>
 </p>
@@ -22,16 +22,32 @@
 </p>
 
 <p align="center">
-  <a href="#installation"><strong>البدء السريع</strong></a> ·
+  <a href="#whats-new-in-this-fork"><strong>الجديد في هذه النسخة</strong></a> ·
+  <a href="#installation">البدء السريع</a> ·
   <a href="#quick-links">روابط سريعة</a> ·
   <a href="#screenshots">لقطات الشاشة</a> ·
-  <a href="#documentation">الوثائق</a> ·
-  <a href="https://github.com/vahapogut/antigravity-add-model/issues/new">الإبلاغ عن مشكلة</a>
+  <a href="#syncing-with-upstream">المزامنة مع المستودع الأصلي</a> ·
+  <a href="https://github.com/prof-slop/antigravity-add-model/issues/new">الإبلاغ عن مشكلة</a>
 </p>
 
 ---
 
-أضف مزودي واجهات API الخارجية والنماذج المحلية إلى جانب نماذج Antigravity المدمجة. اضبطها في الإعدادات، وبدّل النماذج من قائمة المحادثة، ووجّه الطلبات اختياريًا عبر بوابة تضم سجلًا للطلبات ومزودين احتياطيين ولوحة تحكم في المتصفح.
+أضف مزودي واجهات API الخارجية والنماذج المحلية ومجموعات حسابات Google Cloud Code إلى جانب نماذج Antigravity المدمجة. اعرض عناصر HTML/WebGL التفاعلية مباشرة داخل المحادثة، ووجّه الطلبات اختياريًا عبر بوابة مع لوحة تحكم.
+
+<a id="whats-new-in-this-fork"></a>
+
+## الجديد في هذه النسخة (Fork)
+
+يبني هذا المستودع (`prof-slop/antigravity-add-model`) على [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) مع التحسينات التالية:
+
+| التحسين | الوظيفة |
+| --- | --- |
+| **واجهة Generative UI وتخفيف قيود CSP (`cspPreload` + [`skills/generative_ui`](skills/generative_ui/SKILL.md))** | يخفف سياسة أمان المحتوى (CSP) ويرقّي سمات العزل `<iframe>` (`allow-scripts allow-forms allow-downloads allow-modals`) لعرض رسوم WebGL ثلاثية الأبعاد (`Three.js`) والرسوم الرياضية (`JSXGraph` و`Plotly.js`) و`KaTeX` و`D3` و`Chart.js + jStat` مباشرة من شبكات CDN العامة داخل المحادثة. يتضمن مهارة [`generative_ui`](skills/generative_ui/SKILL.md) اختيارية لأقصى كفاءة. |
+| **تبديل احتياطي شامل لعائلة النماذج في حسابات Google** | تغطي مجموعة `google-cloudcode` واحدة مفعّل فيها **Native Failover** تلقائيًا **جميع درجات جهد الاستدلال** ضمن العائلة نفسها (`low` و`medium` و`high` و`xhigh` و`tiered` و`thinking`) عند انتهاء الحصة (`429`). |
+| **قائمة نماذج منظّمة دون تكرار** | تُخفى مجموعات حسابات Google المخصصة للتبديل الاحتياطي التلقائي من قائمة اختيار النماذج في المحادثة مع بقائها نشطة في الخلفية. |
+| **نبضات Keepalive للبث الطويل** | يرسل نبضات `: keepalive` عبر SSE كل 5 ثوانٍ أثناء تجميع وسائط استدعاء الأدوات الكبيرة ويرفع مهلة البث إلى 15 دقيقة. |
+| **الحفاظ على الاستدلال عبر الجولات والوكلاء الفرعيين** | يحفظ `reasoning_content` / `<thinking>` عبر استدعاءات أدوات OpenAI وتوجيه `invoke_subagent`. |
+| **استخراج آمن لبيانات OAuth دون أسرار مخزنة** | لا توجد أسرار `GOCSPX-` مكتوبة في الشيفرة المصدرية أو `dist/`؛ يتم التحقق من الزوج الشخصي وقت التشغيل من ملف `language_server` باستخدام بصمة SHA-256 بطول 64 بت (`6f5c1920f8566f36`). |
 
 > [!IMPORTANT]
 > يستخدم **وكيل سطح المكتب المستقل المبني على Electron** مُثبّت الإضافة الموضّح أدناه. أما **Antigravity IDE المبني على VS Code**، وهو تطبيق منفصل، فيستخدم [محوّل الإعدادات ومدير الويب المحلي](docs/ide.md) الخاصين به. جرى التحقق على Windows مع IDE **2.5.5** من تسجيل الدخول، واختيار النماذج من قائمة IDE الأصلية، وبث المحادثات، باستخدام مزود محلي متوافق مع OpenAI؛ راجع [نتائج التحقق](docs/ide.md#validation-boundary). ينطبق توجيه النماذج المخصصة على الجلسات المحلية، مع الحفاظ على توجيه WSL الخاص بالمزود الأصلي. راجع [التوافق](docs/compatibility.md) قبل التثبيت.
@@ -76,6 +92,35 @@
 <a id="screenshots"></a>
 
 ## لقطات الشاشة
+
+### استعراض Generative UI وتخفيف قيود CSP
+
+مع تفعيل [`src/cspPreload.ts`](src/cspPreload.ts)، تستطيع إطارات `<agent-embed>` في Antigravity تحميل مكتبات الرسوم العلمية والرسوم ثلاثية الأبعاد WebGL من شبكات CDN العامة (**Three.js** و**Plotly.js** و**JSXGraph** و**D3.js** و**Mermaid** و**Chart.js + jStat** و**KaTeX**) مع الحفاظ على عزل Sandbox:
+
+<p align="center">
+  <a href="assets/showcase_distributions_dark.png">
+    <img src="assets/showcase_distributions_dark.png" width="1000" alt="توزيعات غاوسية تفاعلية باستخدام Chart.js + jStat داخل محادثة Antigravity">
+  </a>
+  <br>
+  <em><strong>لوحات إحصائية تفاعلية (Chart.js + jStat)</strong> — تحديث فوري للبيانات دون وميض عبر شريط تمرير <code>sigma</code> مباشرة داخل المحادثة.</em>
+</p>
+
+| **مخطط القوى التفاعلي D3.js (الوضع الداكن)** | **مجسّم WebGL ثلاثي الأبعاد بـ Three.js (الوضع الفاتح)** |
+| :---: | :---: |
+| <a href="assets/showcase_d3_graph_dark.png"><img src="assets/showcase_d3_graph_dark.png" width="490" alt="محاكاة القوى D3.js مع عقد قابلة للسحب"></a> | <a href="assets/showcase_threejs_light.png"><img src="assets/showcase_threejs_light.png" width="490" alt="عقدة حلقية ثلاثية الأبعاد Three.js WebGL مع 900 جسيم في الوضع الفاتح"></a> |
+| *تخطيط فيزيائي تفاعلي مع عقد قابلة للسحب (`d3@7`).* | *مجسّم WebGL في الوقت الفعلي + 900 جسيم (`three@0.160.0`) مع تبديل فوري للمظهر.* |
+
+> [!TIP]
+> **موصى به لأقصى كفاءة (اختياري):** بينما يفتح [`src/cspPreload.ts`](src/cspPreload.ts) شبكات CDN الخارجية في وقت التشغيل، نوصي بتثبيت المهارة المرفقة [`skills/generative_ui`](skills/generative_ui/SKILL.md) للحصول على أفضل النتائج (وهي **اختيارية تمامًا** ويمكنك تخصيصها أو إنشاء مهارتك الخاصة):
+> <div dir="ltr">
+>
+> ```sh
+> mkdir -p ~/.gemini/config/skills && cp -R skills/generative_ui ~/.gemini/config/skills/generative_ui
+> ```
+>
+> </div>
+
+---
 
 <a id="model-management"></a>
 
@@ -145,7 +190,7 @@
 <div dir="ltr">
 
 ```sh
-git clone https://github.com/vahapogut/antigravity-add-model.git
+git clone https://github.com/prof-slop/antigravity-add-model.git
 cd antigravity-add-model
 npm ci --ignore-scripts
 npm run build
@@ -350,6 +395,23 @@ flowchart LR
 
 تضيف الإضافة عناصر التحكم الخاصة بها إلى الإعدادات وتحافظ على بيئة تشغيل التطبيق الأصلية المثبّتة. تعمل البوابة كعملية Node منفصلة وتستخدم مجلد بيانات خاصًا بها.
 
+<a id="syncing-with-upstream"></a>
+
+## المزامنة مع المستودع الأصلي (Upstream)
+
+يتتبع هذا المستودع [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) باعتباره `upstream` مع الحفاظ على الميزات المخصصة على الفرع `main`:
+
+<div dir="ltr">
+
+```sh
+git remote add upstream https://github.com/vahapogut/antigravity-add-model.git
+git fetch upstream && git rebase upstream/main
+npm run build && npm test && node scripts/deploy.mjs
+git push --force-with-lease origin main
+```
+
+</div>
+
 <a id="updates-diagnostics-and-recovery"></a>
 
 ## التحديثات والتشخيص والاستعادة
@@ -449,7 +511,7 @@ npm run test:integration
 
 شعار Antigravity مأخوذ من [المواد الصحفية الرسمية لـ Google](https://antigravity.google/press).
 
-يتولى صيانة المشروع **[vahapogut](https://github.com/vahapogut)** · [LinkedIn](https://www.linkedin.com/in/abdulvahap-ogut-343992398/)
+يتولى صيانة هذه النسخة **[prof-slop](https://github.com/prof-slop/antigravity-add-model)** · المشروع الأصلي بواسطة **[vahapogut](https://github.com/vahapogut/antigravity-add-model)**
 
 <p align="center"><a href="#quick-links">↑ العودة إلى الروابط السريعة</a></p>
 

@@ -2,15 +2,15 @@
   <img src="gateway/dashboard/antigravity-logo.png" width="96" height="96" alt="Logotipo de Google Antigravity">
 </p>
 
-<h1 align="center">Antigravity Custom Model Enabler</h1>
+<h1 align="center">Antigravity Custom Model Enabler — Fork Mejorado</h1>
 
 <p align="center">
-  <strong>Tus proveedores y modelos locales, dentro de Antigravity.</strong><br>
-  Gestión de modelos para la aplicación de escritorio, Antigravity IDE y una pasarela opcional.
+  <strong>Tus proveedores. Tus modelos locales. UI Generativa interactiva. Failover de flota sin desorden.</strong><br>
+  Enrutamiento avanzado de modelos, failover automático de cuotas multi-cuenta y renderizado de artefactos interactivos para Antigravity.
 </p>
 
 <p align="center">
-  <a href="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="#instalación"><img src="https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=nodedotjs&logoColor=white" alt="Node.js 22.13 o posterior"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-2563eb" alt="Licencia Apache 2.0"></a>
 </p>
@@ -20,14 +20,30 @@
 </p>
 
 <p align="center">
-  <a href="#instalación"><strong>Inicio rápido</strong></a> ·
+  <a href="#novedades-en-este-fork"><strong>Novedades en este fork</strong></a> ·
+  <a href="#instalación">Inicio rápido</a> ·
   <a href="#añadir-modelos">Añadir modelos</a> ·
   <a href="#pasarela-y-acceso-remoto">Acceso remoto</a> ·
-  <a href="#documentación-y-contribuciones">Documentación</a> ·
-  <a href="https://github.com/vahapogut/antigravity-add-model/issues">Ayuda</a>
+  <a href="#sincronización-con-upstream">Sincronización</a> ·
+  <a href="https://github.com/prof-slop/antigravity-add-model/issues">Ayuda</a>
 </p>
 
-Añade API externas y modelos locales junto a los modelos integrados de Antigravity. Configúralos en el administrador de modelos y selecciónalos al conversar. La pasarela opcional añade enrutamiento centralizado, historial y un panel web.
+Añade API externas, modelos locales y grupos de cuentas Google Cloud Code junto a los modelos integrados de Antigravity. Configúralos en el administrador de modelos, renderiza artefactos interactivos HTML/WebGL en el chat y usa la pasarela opcional con historial y panel web.
+
+---
+
+## Novedades en este fork
+
+Este repositorio (`prof-slop/antigravity-add-model`) amplía [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) con mejoras clave:
+
+| Mejora | Qué hace |
+| --- | --- |
+| **UI Generativa y desbloqueo de sandbox CSP (`cspPreload` + [`skills/generative_ui`](skills/generative_ui/SKILL.md))** | Relaja la Content Security Policy y actualiza los sandboxes `<iframe>` (`allow-scripts allow-forms allow-downloads allow-modals`) para artefactos HTML. Permite WebGL 3D (`Three.js`), gráficos matemáticos (`JSXGraph`, `Plotly.js`), `KaTeX`, `D3`, `Chart.js + jStat` y CDNs públicos directamente en el chat. Incluye la skill opcional [`generative_ui`](skills/generative_ui/SKILL.md) para máxima eficacia. |
+| **Failover nativo por familia de modelos en Google Fleet** | Un único grupo `google-cloudcode` con **Native Failover** cubre automáticamente **todos los niveles de esfuerzo de razonamiento** de la misma familia (`low`, `medium`, `high`, `xhigh`, `tiered`, `thinking`) ante límites de cuota (`429`). |
+| **Selector de modelos limpio** | Los grupos de flota con **Native Failover** activo se ocultan automáticamente del selector del chat mientras permanecen activos en segundo plano. |
+| **Keepalives SSE y resiliencia en streaming largo** | Envía latidos `: keepalive` cada 5 segundos al almacenar en búfer grandes argumentos JSON de llamadas a herramientas y amplía el tiempo de espera a 15 minutos. |
+| **Preservación de razonamiento multi-turno y subagentes** | Conserva `reasoning_content` / `<thinking>` entre llamadas a herramientas OpenAI y delegación `invoke_subagent`. |
+| **Extracción endurecida de OAuth sin secretos en el código** | Cero secretos `GOCSPX-` en el código fuente o `dist/`; verifica el par personal en tiempo de ejecución desde `language_server` mediante una huella SHA-256 de 64 bits (`6f5c1920f8566f36`). |
 
 Esta es una guía resumida en español. Las guías técnicas enlazadas están en **inglés**; los nombres de botones y opciones se mantienen como aparecen en la interfaz.
 
@@ -52,6 +68,31 @@ Los catálogos de proveedores como OpenRouter pueden ofrecer cientos de modelos.
 
 ## Capturas
 
+### Demostración de UI Generativa y relajación de CSP
+
+Con [`src/cspPreload.ts`](src/cspPreload.ts) activo, los iframes `<agent-embed>` de Antigravity cargan motores científicos, gráficos y WebGL 3D desde CDNs públicos (**Three.js**, **Plotly.js**, **JSXGraph**, **D3.js**, **Mermaid**, **Chart.js + jStat** y **KaTeX**) manteniendo el aislamiento del sandbox:
+
+<p align="center">
+  <a href="assets/showcase_distributions_dark.png">
+    <img src="assets/showcase_distributions_dark.png" width="1000" alt="Distribuciones de mezcla gaussiana interactivas con Chart.js + jStat en el chat de Antigravity">
+  </a>
+  <br>
+  <em><strong>Paneles estadísticos interactivos (Chart.js + jStat)</strong> — Actualización sin parpadeos mediante el control deslizante <code>sigma</code> directamente en el chat.</em>
+</p>
+
+| **Grafo de fuerzas D3.js (Modo oscuro)** | **Variedad 3D WebGL con Three.js (Modo claro)** |
+| :---: | :---: |
+| <a href="assets/showcase_d3_graph_dark.png"><img src="assets/showcase_d3_graph_dark.png" width="490" alt="Simulación de fuerzas D3.js con nodos arrastrables"></a> | <a href="assets/showcase_threejs_light.png"><img src="assets/showcase_threejs_light.png" width="490" alt="Nudo toroidal WebGL en Three.js con 900 partículas en modo claro"></a> |
+| *Diseño de fuerzas físico interactivo con nodos arrastrables (`d3@7`).* | *Nudo toroidal WebGL en tiempo real + 900 partículas (`three@0.160.0`) con cambio de tema.* |
+
+> [!TIP]
+> **Recomendado para máxima eficacia (Opcional):** Aunque [`src/cspPreload.ts`](src/cspPreload.ts) desbloquea los CDNs externos en tiempo de ejecución, te recomendamos instalar la skill incluida [`skills/generative_ui`](skills/generative_ui/SKILL.md) para enseñar al agente la matriz de enrutamiento CDN, actualizaciones sin parpadeo con `requestAnimationFrame` y tarjetas compactas `<430px` (es **totalmente opcional** y puedes crear la tuya propia):
+> ```sh
+> mkdir -p ~/.gemini/config/skills && cp -R skills/generative_ui ~/.gemini/config/skills/generative_ui
+> ```
+
+---
+
 <p align="center">
   <a href="assets/model_manager.jpg"><img src="assets/model_manager.jpg" width="1000" alt="Administrador de modelos con búsqueda, grupos por proveedor e importación"></a>
 </p>
@@ -67,7 +108,7 @@ Los catálogos de proveedores como OpenRouter pueden ofrecer cientos de modelos.
 Necesitas Git, **Node.js 22.13 o posterior** y la aplicación de Antigravity que quieras configurar.
 
 ```sh
-git clone https://github.com/vahapogut/antigravity-add-model.git
+git clone https://github.com/prof-slop/antigravity-add-model.git
 cd antigravity-add-model
 npm ci --ignore-scripts
 npm run build
@@ -163,6 +204,17 @@ Los modelos se guardan normalmente en `~/.gemini/antigravity/custom_models.json`
 
 Los servicios locales y la pasarela tienen controles de acceso distintos. Mantén privadas las URL de administración con token y sigue las guías de [datos y credenciales](docs/configuration.md#credentials-and-data), [seguridad del IDE](docs/ide.md#model-manager-and-credentials) y [almacenamiento de la pasarela](gateway/README.md#lifecycle-and-data).
 
+## Sincronización con upstream
+
+Este fork sigue a [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) como `upstream`:
+
+```sh
+git remote add upstream https://github.com/vahapogut/antigravity-add-model.git
+git fetch upstream && git rebase upstream/main
+npm run build && npm test && node scripts/deploy.mjs
+git push --force-with-lease origin main
+```
+
 ## Diagnóstico y recuperación
 
 Después de actualizar Antigravity, vuelve a compilar y comprobar la compatibilidad antes de reinstalar el complemento.
@@ -218,4 +270,4 @@ Las pruebas de CI usan proveedores locales simulados e instalaciones aisladas en
 
 El logotipo de Antigravity procede de los [recursos de prensa oficiales de Google](https://antigravity.google/press).
 
-Mantenido por **[vahapogut](https://github.com/vahapogut)** · [LinkedIn](https://www.linkedin.com/in/abdulvahap-ogut-343992398/)
+Fork mantenido por **[prof-slop](https://github.com/prof-slop/antigravity-add-model)** · Proyecto original por **[vahapogut](https://github.com/vahapogut/antigravity-add-model)**

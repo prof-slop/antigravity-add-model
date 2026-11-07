@@ -2,15 +2,15 @@
   <img src="gateway/dashboard/antigravity-logo.png" width="96" height="96" alt="Google Antigravity logosu">
 </p>
 
-<h1 align="center">Antigravity Custom Model Enabler</h1>
+<h1 align="center">Antigravity Custom Model Enabler — Geliştirilmiş Fork</h1>
 
 <p align="center">
-  <strong>Kendi sağlayıcıların ve yerel modellerin, Antigravity içinde.</strong><br>
-  Masaüstü uygulaması, Antigravity IDE ve isteğe bağlı ağ geçidi için model yönetimi.
+  <strong>Kendi sağlayıcıların. Yerel modellerin. Etkileşimli Üretken Arayüz (Generative UI). Kalabalık yaratmayan Filo Yedeklemesi.</strong><br>
+  Masaüstü uygulaması, Antigravity IDE ve isteğe bağlı ağ geçidi için gelişmiş model yönlendirme, çoklu hesap kota yedeklemesi ve zengin bileşen oluşturma.
 </p>
 
 <p align="center">
-  <a href="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="#installation"><img src="https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=nodedotjs&logoColor=white" alt="Node.js 22.13 veya üzeri"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-2563eb" alt="Apache Lisansı 2.0"></a>
 </p>
@@ -20,16 +20,32 @@
 </p>
 
 <p align="center">
-  <a href="#installation"><strong>Hızlı başlangıç</strong></a> ·
+  <a href="#whats-new-in-this-fork"><strong>Bu fork'taki yenilikler</strong></a> ·
+  <a href="#installation">Hızlı başlangıç</a> ·
   <a href="#quick-links">Hızlı bağlantılar</a> ·
   <a href="#screenshots">Ekran görüntüleri</a> ·
-  <a href="#documentation">Dokümantasyon</a> ·
-  <a href="https://github.com/vahapogut/antigravity-add-model/issues/new">Sorun bildir</a>
+  <a href="#syncing-with-upstream">Upstream ile senkronizasyon</a> ·
+  <a href="https://github.com/prof-slop/antigravity-add-model/issues/new">Sorun bildir</a>
 </p>
 
 ---
 
-Antigravity'nin yerleşik modellerinin yanına harici API sağlayıcıları ve yerel modeller ekle. Ayarlardan yapılandır, sohbetin model seçicisinden modeller arasında geçiş yap. İstersen istekleri; geçmiş, yedek sağlayıcılar ve tarayıcı paneli sunan bir ağ geçidi üzerinden yönlendir.
+Antigravity'nin yerleşik modellerinin yanına harici API sağlayıcıları, yerel modeller ve çoklu Google Cloud Code kota havuzları ekle. Ayarlardan yapılandır, sohbet seçicisinden modelleri değiştir, etkileşimli HTML/WebGL bileşenlerini doğrudan sohbette görüntüle ve istersen istekleri ağ geçidi üzerinden yönlendir.
+
+<a id="whats-new-in-this-fork"></a>
+
+## Bu Fork'taki Yenilikler
+
+Bu depo (`prof-slop/antigravity-add-model`), [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) üzerine şu geliştirmeleri ekler:
+
+| Geliştirme | Açıklama |
+| --- | --- |
+| **Generative UI ve Sandbox Kilidi Açma (`cspPreload` + [`skills/generative_ui`](skills/generative_ui/SKILL.md))** | İçerik Güvenlik Politikasını (CSP) esnetir ve kısıtlayıcı `<iframe>` sandbox özniteliklerini (`allow-scripts allow-forms allow-downloads allow-modals`) otomatik yükseltir. Antigravity sohbetinde doğrudan 3B WebGL (`Three.js`), matematiksel çizim (`JSXGraph`, `Plotly.js`), `KaTeX`, `D3`, `Chart.js + jStat` ve harici CDN'leri etkinleştirir. En yüksek verim için isteğe bağlı [`generative_ui` yeteneği](skills/generative_ui/SKILL.md) içerir. |
+| **Model Ailesi Genelinde Yerel Google Filo Yedeklemesi** | **Native Failover** etkinleştirilmiş tek bir `google-cloudcode` havuzu, birincil hesap `429` kota sınırına ulaştığında aynı model ailesindeki **tüm akıl yürütme düzeylerini** (`low`, `medium`, `high`, `xhigh`, `tiered`, `thinking`) otomatik olarak kapsar. |
+| **Sade Model Seçici** | Yalnızca arka plan **Native Failover** için kullanılan Google Filo havuzları sohbet model seçicisinden otomatik gizlenir. |
+| **Uzun Akış Keepalive Kalp Atışları** | Büyük araç çağrısı argümanları (ör. 40 KB `write_file`) tamponlanırken her 5 saniyede bir `: keepalive` SSE sinyali gönderir ve akış zaman aşımını 15 dakikaya çıkarır. |
+| **Çok Turlu Akıl Yürütme ve Alt Ajan Koruma** | OpenAI araç çağrısı turları ve özel `invoke_subagent` yönlendirmeleri boyunca `reasoning_content` / `<thinking>` izlerini korur. |
+| **Kodda Sır Barındırmayan Güçlendirilmiş OAuth Çıkarımı** | Kaynak kodda veya `dist/` içinde sabit kodlanmış `GOCSPX-` sırrı yoktur; çalışma zamanında `language_server` ikilisinden 64-bit SHA-256 parmak izi (`6f5c1920f8566f36`) ile doğrular. |
 
 Bu belge Türkçedir. Bağlantı verilen ayrıntılı teknik rehberler İngilizcedir; düğme ve seçenek adları arayüzde göründüğü haliyle korunmuştur.
 
@@ -74,6 +90,31 @@ Kurulum aracı, uygulamanın mevcut çalışma ortamını koruyarak doğrulanmı
 <a id="screenshots"></a>
 
 ## Ekran görüntüleri
+
+### Generative UI ve CSP Esnetme Vitrin Gösterimi
+
+[`src/cspPreload.ts`](src/cspPreload.ts) etkinleştirildiğinde, Antigravity'nin `<agent-embed>` iframe'leri ana bilgisayar sandbox izolasyonunu koruyarak genel CDN'lerden (**Three.js**, **Plotly.js**, **JSXGraph**, **D3.js**, **Mermaid**, **Chart.js + jStat** ve **KaTeX**) canlı, etkileşimli diyagramlar yükler:
+
+<p align="center">
+  <a href="assets/showcase_distributions_dark.png">
+    <img src="assets/showcase_distributions_dark.png" width="1000" alt="Antigravity sohbetinde satır içi oluşturulan Chart.js + jStat etkileşimli Gauss karışım dağılımları">
+  </a>
+  <br>
+  <em><strong>Etkileşimli İstatistiksel Paneller (Chart.js + jStat)</strong> — Canlı <code>sigma</code> kaydırıcısıyla doğrudan sohbet akışında titreşimsiz veri güncellemesi.</em>
+</p>
+
+| **D3.js Kuvvet Yönlü Grafik (Koyu Mod)** | **Three.js 3B WebGL Manifold (Açık Mod)** |
+| :---: | :---: |
+| <a href="assets/showcase_d3_graph_dark.png"><img src="assets/showcase_d3_graph_dark.png" width="490" alt="Sürüklenebilir düğümlerle D3.js kuvvet simülasyonu"></a> | <a href="assets/showcase_threejs_light.png"><img src="assets/showcase_threejs_light.png" width="490" alt="Açık temada Three.js WebGL torus düğümü ve 900 parçacık sürüsü"></a> |
+| *Sürüklenebilir düğümlere sahip etkileşimli fizik yerleşimi (`d3@7`).* | *Gerçek zamanlı WebGL torus-knot manifoldu + 900 parçacık sürüsü (`three@0.160.0`).* |
+
+> [!TIP]
+> **Maksimum Verim İçin Önerilir (İsteğe Bağlı):** [`src/cspPreload.ts`](src/cspPreload.ts) çalışma zamanında harici CDN'lerin kilidini açsa da, en iyi sonuçlar için projede yer alan [`skills/generative_ui`](skills/generative_ui/SKILL.md) yeteneğini kurmanız önerilir (tamamen **isteğe bağlıdır**; olduğu gibi kullanabilir veya kendi yeteneğinizi oluşturabilirsiniz):
+> ```sh
+> mkdir -p ~/.gemini/config/skills && cp -R skills/generative_ui ~/.gemini/config/skills/generative_ui
+> ```
+
+---
 
 <a id="model-management"></a>
 
@@ -141,7 +182,7 @@ Ağ geçidi bağlantısını kaydet, model takma adlarını içe aktar ve yönet
 **Bağımsız Antigravity masaüstü uygulaması**, Git ve **Node.js 22.13 veya üzeri** gerekir. Bu Node sürümü hem masaüstü eklentisini hem isteğe bağlı ağ geçidini destekler.
 
 ```sh
-git clone https://github.com/vahapogut/antigravity-add-model.git
+git clone https://github.com/prof-slop/antigravity-add-model.git
 cd antigravity-add-model
 npm ci --ignore-scripts
 npm run build
@@ -312,6 +353,19 @@ flowchart LR
 
 Eklenti, uygulamanın mevcut çalışma ortamını koruyarak Ayarlar kontrollerini ekler. Ağ geçidi ayrı bir Node süreci olarak çalışır ve kendi veri klasörünü kullanır.
 
+<a id="syncing-with-upstream"></a>
+
+## Upstream ile senkronizasyon
+
+Bu fork, özel geliştirmeleri `main` dalında korurken [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) deposunu `upstream` olarak takip eder:
+
+```sh
+git remote add upstream https://github.com/vahapogut/antigravity-add-model.git
+git fetch upstream && git rebase upstream/main
+npm run build && npm test && node scripts/deploy.mjs
+git push --force-with-lease origin main
+```
+
 <a id="updates-diagnostics-and-recovery"></a>
 
 ## Güncelleme, tanılama ve kurtarma
@@ -401,6 +455,6 @@ Yeni bir sağlayıcı eklemek için [masaüstü sağlayıcı kataloğundan](src/
 
 Antigravity logosu [Google'ın resmi basın materyallerinden](https://antigravity.google/press) alınmıştır.
 
-Bakımını yapan: **[vahapogut](https://github.com/vahapogut)** · [LinkedIn](https://www.linkedin.com/in/abdulvahap-ogut-343992398/)
+Fork bakımı: **[prof-slop](https://github.com/prof-slop/antigravity-add-model)** · Orijinal proje: **[vahapogut](https://github.com/vahapogut/antigravity-add-model)**
 
 <p align="center"><a href="#quick-links">↑ Hızlı bağlantılara dön</a></p>

@@ -2,15 +2,15 @@
   <img src="gateway/dashboard/antigravity-logo.png" width="96" height="96" alt="Логотип Google Antigravity">
 </p>
 
-<h1 align="center">Antigravity Custom Model Enabler</h1>
+<h1 align="center">Antigravity Custom Model Enabler — Расширенный форк</h1>
 
 <p align="center">
-  <strong>Ваши провайдеры. Ваши локальные модели. Внутри Antigravity.</strong><br>
-  Управление моделями в настольном приложении, Antigravity IDE и через необязательный шлюз.
+  <strong>Ваши провайдеры. Ваши локальные модели. Интерактивный Generative UI. Резервирование пулов без лишнего шума.</strong><br>
+  Продвинутая маршрутизация моделей, автоматическое переключение квот между аккаунтами и рендеринг интерактивных виджетов в Antigravity.
 </p>
 
 <p align="center">
-  <a href="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="#installation"><img src="https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=nodedotjs&logoColor=white" alt="Node.js 22.13 или новее"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-2563eb" alt="Лицензия Apache 2.0"></a>
 </p>
@@ -20,16 +20,32 @@
 </p>
 
 <p align="center">
-  <a href="#installation"><strong>Быстрый старт</strong></a> ·
+  <a href="#whats-new-in-this-fork"><strong>Что нового в этом форке</strong></a> ·
+  <a href="#installation">Быстрый старт</a> ·
   <a href="#quick-links">Быстрые ссылки</a> ·
   <a href="#screenshots">Скриншоты</a> ·
-  <a href="#documentation">Документация</a> ·
-  <a href="https://github.com/vahapogut/antigravity-add-model/issues/new">Сообщить о проблеме</a>
+  <a href="#syncing-with-upstream">Синхронизация с upstream</a> ·
+  <a href="https://github.com/prof-slop/antigravity-add-model/issues/new">Сообщить о проблеме</a>
 </p>
 
 ---
 
-Добавляйте внешние API и локальные модели рядом со встроенными моделями Antigravity. Настраивайте их в Settings, переключайтесь между ними в списке моделей чата и при необходимости направляйте запросы через шлюз с историей, резервными провайдерами и веб-панелью управления.
+Добавляйте внешние API, локальные модели и пулы аккаунтов Google Cloud Code рядом со встроенными моделями Antigravity. Настраивайте их в Settings, рендерите интерактивные HTML/WebGL-виджеты прямо в чате и при необходимости направляйте запросы через шлюз с историей и веб-панелью.
+
+<a id="whats-new-in-this-fork"></a>
+
+## Что нового в этом форке
+
+Этот репозиторий (`prof-slop/antigravity-add-model`) расширяет [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) следующими улучшениями:
+
+| Улучшение | Описание |
+| --- | --- |
+| **Generative UI и разблокировка песочницы CSP (`cspPreload` + [`skills/generative_ui`](skills/generative_ui/SKILL.md))** | Ослабляет Content Security Policy и автоматически обновляет атрибуты `<iframe>` (`allow-scripts allow-forms allow-downloads allow-modals`) для HTML-артефактов. Позволяет использовать 3D WebGL (`Three.js`), математические графики (`JSXGraph`, `Plotly.js`), `KaTeX`, `D3`, `Chart.js + jStat` и внешние CDN прямо в чате Antigravity. Включает необязательный навык [`generative_ui`](skills/generative_ui/SKILL.md) для максимального качества рендеринга. |
+| **Резервирование пулов Google по всему семейству моделей** | Один пул `google-cloudcode` с включённым **Native Failover** автоматически охватывает **все уровни рассуждения** в том же семействе моделей (`low`, `medium`, `high`, `xhigh`, `tiered`, `thinking`) при исчерпании квоты (`429`). |
+| **Чистый список выбора моделей** | Пулы Google Fleet с включённым **Native Failover** автоматически скрываются из выпадающего списка чата, оставаясь активными в фоновом режиме. |
+| **SSE Keepalive и устойчивость длинных потоков** | Отправляет сигналы `: keepalive` каждые 5 секунд во время буферизации больших аргументов вызова инструментов (например, 40 КБ `write_file`) и увеличивает тайм-аут потоковой передачи до 15 минут. |
+| **Сохранение рассуждений в многошаговых вызовах инструментов и субагентах** | Сохраняет `reasoning_content` / `<thinking>` при вызовах инструментов OpenAI и маршрутизации `invoke_subagent`. |
+| **Защищённое извлечение OAuth без секретов в коде** | Никаких зашитых секретов `GOCSPX-` в исходном коде или `dist/`; проверяет пару ключей во время выполнения из бинарного файла `language_server` по 64-битному SHA-256 отпечатку (`6f5c1920f8566f36`). |
 
 > [!IMPORTANT]
 > Для **отдельного настольного агента на Electron** предназначен установщик дополнения, описанный ниже. Другая программа — **Antigravity IDE на основе VS Code** — использует собственные [адаптер настроек и локальный веб-менеджер](docs/ide.md). В Windows IDE **2.5.5** проверены вход в систему, выбор модели во встроенном списке и потоковый чат с локальным OpenAI-совместимым провайдером; см. [результаты проверки](docs/ide.md#validation-boundary). Маршрутизация пользовательских моделей действует для локальных сеансов; маршрутизация WSL, предусмотренная разработчиком IDE, сохраняется. Перед установкой ознакомьтесь с [совместимостью](docs/compatibility.md).
@@ -74,6 +90,31 @@
 <a id="screenshots"></a>
 
 ## Скриншоты
+
+### Демонстрация Generative UI и ослабления CSP
+
+При активном [`src/cspPreload.ts`](src/cspPreload.ts) фреймы `<agent-embed>` в Antigravity загружают научные, графические и 3D WebGL-библиотеки из публичных CDN (**Three.js**, **Plotly.js**, **JSXGraph**, **D3.js**, **Mermaid**, **Chart.js + jStat** и **KaTeX**), сохраняя изоляцию песочницы:
+
+<p align="center">
+  <a href="assets/showcase_distributions_dark.png">
+    <img src="assets/showcase_distributions_dark.png" width="1000" alt="Интерактивные гауссовы распределения Chart.js + jStat прямо в чате Antigravity">
+  </a>
+  <br>
+  <em><strong>Интерактивные статистические панели (Chart.js + jStat)</strong> — Мгновенное обновление данных без мерцания с помощью ползунка <code>sigma</code> прямо в потоке чата.</em>
+</p>
+
+| **Силовой граф D3.js (Тёмная тема)** | **3D WebGL-многообразие Three.js (Светлая тема)** |
+| :---: | :---: |
+| <a href="assets/showcase_d3_graph_dark.png"><img src="assets/showcase_d3_graph_dark.png" width="490" alt="Силовая симуляция D3.js с перетаскиваемыми узлами"></a> | <a href="assets/showcase_threejs_light.png"><img src="assets/showcase_threejs_light.png" width="490" alt="Торический узел Three.js WebGL и рой из 900 частиц в светлой теме"></a> |
+| *Интерактивная физическая раскладка графа с перетаскиваемыми узлами (`d3@7`).* | *Торический узел WebGL в реальном времени + рой из 900 частиц (`three@0.160.0`) с переключением темы.* |
+
+> [!TIP]
+> **Рекомендуется для максимальной эффективности (Необязательно):** Хотя [`src/cspPreload.ts`](src/cspPreload.ts) разблокирует внешние CDN на уровне среды выполнения, для достижения наилучшего результата рекомендуется установить включённый в проект навык [`skills/generative_ui`](skills/generative_ui/SKILL.md) (он **полностью необязателен** — вы можете использовать его как есть или создать собственный навык):
+> ```sh
+> mkdir -p ~/.gemini/config/skills && cp -R skills/generative_ui ~/.gemini/config/skills/generative_ui
+> ```
+
+---
 
 <a id="model-management"></a>
 
@@ -141,7 +182,7 @@
 Вам понадобятся **отдельное настольное приложение Antigravity**, Git и **Node.js 22.13 или новее**. Эта версия Node подходит и для настольного дополнения, и для необязательного шлюза.
 
 ```sh
-git clone https://github.com/vahapogut/antigravity-add-model.git
+git clone https://github.com/prof-slop/antigravity-add-model.git
 cd antigravity-add-model
 npm ci --ignore-scripts
 npm run build
@@ -312,6 +353,19 @@ flowchart LR
 
 Дополнение добавляет свои элементы в Settings и сохраняет установленную среду выполнения разработчика приложения. Шлюз работает как отдельный процесс Node и использует собственный каталог данных.
 
+<a id="syncing-with-upstream"></a>
+
+## Синхронизация с upstream
+
+Этот форк отслеживает [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) как `upstream`, сохраняя собственные улучшения в ветке `main`:
+
+```sh
+git remote add upstream https://github.com/vahapogut/antigravity-add-model.git
+git fetch upstream && git rebase upstream/main
+npm run build && npm test && node scripts/deploy.mjs
+git push --force-with-lease origin main
+```
+
 <a id="updates-diagnostics-and-recovery"></a>
 
 ## Обновления, диагностика и восстановление
@@ -403,6 +457,6 @@ CI выполняется в Windows, macOS и Linux с локальными т�
 
 Логотип Antigravity взят из [официальных материалов Google для прессы](https://antigravity.google/press).
 
-Проект поддерживает **[vahapogut](https://github.com/vahapogut)** · [LinkedIn](https://www.linkedin.com/in/abdulvahap-ogut-343992398/)
+Форк поддерживает **[prof-slop](https://github.com/prof-slop/antigravity-add-model)** · Исходный проект: **[vahapogut](https://github.com/vahapogut/antigravity-add-model)**
 
 <p align="center"><a href="#quick-links">↑ К быстрым ссылкам</a></p>

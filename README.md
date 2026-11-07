@@ -2,15 +2,15 @@
   <img src="gateway/dashboard/antigravity-logo.png" width="96" height="96" alt="Google Antigravity logo">
 </p>
 
-<h1 align="center">Antigravity Custom Model Enabler</h1>
+<h1 align="center">Antigravity Custom Model Enabler — Enhanced Fork</h1>
 
 <p align="center">
-  <strong>Your providers. Your local models. Inside Antigravity.</strong><br>
-  Model management for the desktop app, Antigravity IDE, and an optional gateway.
+  <strong>Your providers. Your local models. Interactive Generative UI. Zero-clutter Fleet failover.</strong><br>
+  Advanced model routing, multi-account quota failover, and rich artifact rendering for the Antigravity desktop app, Antigravity IDE, and optional gateway.
 </p>
 
 <p align="center">
-  <a href="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="#installation"><img src="https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=nodedotjs&logoColor=white" alt="Node.js 22.13 or newer"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-2563eb" alt="Apache License 2.0"></a>
 </p>
@@ -20,19 +20,37 @@
 </p>
 
 <p align="center">
-  <a href="#installation"><strong>Quick start</strong></a> ·
+  <a href="#whats-new-in-this-fork"><strong>What's new in this fork</strong></a> ·
+  <a href="#generative-ui--csp-relaxation-showcase">Generative UI showcase</a> ·
+  <a href="#installation">Quick start</a> ·
   <a href="#quick-links">Quick links</a> ·
-  <a href="#screenshots">Screenshots</a> ·
-  <a href="#documentation">Documentation</a> ·
-  <a href="https://github.com/vahapogut/antigravity-add-model/issues/new">Report an issue</a>
+  <a href="#syncing-with-upstream">Syncing with upstream</a> ·
+  <a href="https://github.com/prof-slop/antigravity-add-model/issues/new">Report an issue</a>
 </p>
 
 ---
 
-Add external API providers and local models alongside Antigravity's built-in models. Configure them in Settings, switch models from the chat picker, and optionally route requests through a gateway with history, fallback providers, and a browser dashboard.
+Add external API providers, local models, and multi-account Google Cloud Code quota pools alongside Antigravity's built-in models. Configure them in **Settings**, switch models from the chat picker, render interactive HTML/WebGL artifacts inline, and optionally route requests through a local gateway with history, fallback chains, and a web dashboard.
 
 > [!IMPORTANT]
-> The **standalone Electron desktop agent** uses the additive installer below. The separate **VS Code-based Antigravity IDE** uses its own [settings adapter and local web manager](docs/ide.md). Windows IDE **2.5.5** sign-in, native model selection and streamed chat were verified with a local OpenAI-compatible provider; see the [validation results](docs/ide.md#validation-boundary). Custom-model routing applies to local sessions; the vendor's WSL routing is preserved. Check [compatibility](docs/compatibility.md) before installing.
+> The **standalone Electron desktop agent** uses the additive installer below. The separate **VS Code-based Antigravity IDE** uses its own [settings adapter and local web manager](docs/ide.md). Check [compatibility](docs/compatibility.md) before installing.
+
+---
+
+## What's New in This Fork
+
+This repository (`prof-slop/antigravity-add-model`) builds on [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) with opinionated enhancements for power users:
+
+| Enhancement | What it does |
+| --- | --- |
+| **Generative UI & Artifact Sandbox Unlock (`cspPreload` + [`skills/generative_ui`](skills/generative_ui/SKILL.md))** | Relaxes Content Security Policy (`script-src`, `style-src`, `font-src`, `connect-src`, `worker-src`) and automatically upgrades restrictive `<iframe>` sandboxes (`allow-scripts allow-forms allow-downloads allow-modals`) for rendered HTML artifacts. Enables interactive 3D WebGL (`Three.js`), math graphing (`JSXGraph`, `Plotly.js`), `KaTeX`, `D3`, `Chart.js + jStat`, and external CDNs directly inside Antigravity chat. Includes an optional, ready-to-use [`generative_ui` skill](skills/generative_ui/SKILL.md) for maximum rendering quality. |
+| **Family-Wide Native Google Fleet Failover** | A single `google-cloudcode` account pool with **Native Failover** enabled automatically covers **every reasoning-effort variant** in that model family (`low`, `medium`, `high`, `xhigh`, `tiered`, `thinking` — e.g., `gemini-4-argon-low/medium/high` or `gemini-3.8-flash-low/medium/high/tiered`) when your primary IDE account hits a `429` quota limit. |
+| **Zero-Clutter Model Selector** | Google Cloud Code Fleet pools configured for background **Native Failover** are automatically hidden from the chat model picker dropdown while remaining active in the background and manageable in **Settings → Custom Models**. |
+| **Long-Stream Keepalives & Tool-Call Resilience** | Emits downstream `: keepalive` SSE heartbeats every 5 seconds while buffering large streamed tool-call payloads (e.g., 40 KB `write_file` arguments from high-reasoning models on OpenRouter) and extends streaming request/retry budgets to 15 minutes so slow FP4/thinking endpoints never drop mid-tool-call. |
+| **Multi-Turn Reasoning & Subagent Preservation** | Preserves `reasoning_content` / `<thinking>` traces across OpenAI-compatible tool-call round trips and custom `invoke_subagent` routing (`$model`, `customModelId`). |
+| **Secret-Free Hardened Vendor OAuth Extraction** | Zero hardcoded `GOCSPX-` client secrets in source or `dist/`. Extracts the personal OAuth credential pair from the local `language_server` binary at runtime using a non-reversible 64-bit SHA-256 pair fingerprint (`6f5c1920f8566f36`) with ordinal fallback, plus dynamic `process.platform` / `process.arch` User-Agent identification. |
+
+---
 
 ## Quick links
 
@@ -40,8 +58,8 @@ Add external API providers and local models alongside Antigravity's built-in mod
 | --- | --- | --- |
 | [Installation](#installation) | [Gateway and web dashboard](#optional-gateway-and-web-dashboard) | [Troubleshooting and recovery](#updates-diagnostics-and-recovery) |
 | [Add your first model](#add-your-first-model) | [Connect from another computer](#connect-from-another-computer) | [Supported app versions and layouts](docs/compatibility.md) |
-| [Providers and model catalogs](docs/providers.md) | [Model configuration](docs/configuration.md) | [Changelog](CHANGELOG.md) |
-| [Development and contributing](#development-and-contributing) | [Google account setup](docs/configuration.md#google-cloud-code-account-pools) | [Browse existing issues](https://github.com/vahapogut/antigravity-add-model/issues) |
+| [Providers and model catalogs](docs/providers.md) | [Model configuration](docs/configuration.md) | [Syncing with upstream](#syncing-with-upstream) |
+| [Development and contributing](#development-and-contributing) | [Google account setup](docs/configuration.md#google-cloud-code-account-pools) | [Changelog](CHANGELOG.md) |
 | [Antigravity IDE setup](docs/ide.md) | [Source-based feature comparison](docs/feature-parity.md) | [IDE status and restore](docs/ide.md#status-and-recovery) |
 | [Cloudflare setup wizard](docs/workers-ai-setup.md) | [Fallback chains](docs/providers.md#fallback-chains-for-rate-limited-providers) | [Local proxy security](docs/compatibility.md#local-proxy-trust-boundary) |
 
@@ -51,12 +69,13 @@ Add external API providers and local models alongside Antigravity's built-in mod
 | --- | --- |
 | **Manage models** | Provider groups, search, edit, duplicate, enable/disable, model discovery, and keyboard search in the standalone model dropdown. |
 | **Connect your providers** | OpenAI, Anthropic, Gemini, OpenRouter, [Cloudflare Workers AI](docs/providers.md#cloudflare-workers-ai), and other compatible APIs; local services such as Ollama, LM Studio, and vLLM. |
-| **Tune requests** | Protocol selection, reasoning settings, context/output limits, custom headers, timeouts, retries, fallbacks, and circuit breakers. |
-| **Choose subagent models** | Clients with `invoke_subagent` support custom child models with isolated routing. Antigravity IDE can delegate independent text tasks through the [custom-model MCP tools](docs/ide.md#delegate-to-custom-models-with-mcp). |
-| **Use Google account pools** | [Antigravity account sign-in](docs/configuration.md#google-cloud-code-account-pools), collapsible account cards, enable/disable, label editing, removal, and Preferred/Automatic controls. Each pool retains its own project, credentials and visible quotas; plan badges use provider-reported tiers only. The native fallback switch uses an exact-model Cloud Code pool, with no public Gemini API fallback. [Account controls](docs/configuration.md#quota-panel-and-preferred-accounts). |
-| **Estimate visible chat context** | A read-only ring beside a recognized native model selector marks transcript estimates with `~` and unavailable usage with `?`. Hidden prompts, tool definitions and images are excluded. Configured context limits take priority; clicking can look up a missing limit in the bounded public models.dev catalog without saving configuration. [Scope and limits](docs/configuration.md#native-context-estimate). |
+| **Render interactive Generative UI** | Inline `<agent-embed>` and artifact HTML widgets with full WebGL, Canvas, SVG, and external CDN script support via `cspPreload`. |
+| **Tune requests** | Protocol selection, reasoning settings, context/output limits, custom headers, 15-minute streaming timeouts, SSE keepalives, retries, fallbacks, and circuit breakers. |
+| **Choose subagent models** | Clients with `invoke_subagent` support custom child models with isolated routing and preserved reasoning traces. Antigravity IDE can delegate independent text tasks through the [custom-model MCP tools](docs/ide.md#delegate-to-custom-models-with-mcp). |
+| **Use Google account pools & family-wide failover** | [Antigravity account sign-in](docs/configuration.md#google-cloud-code-account-pools), collapsible account cards, enable/disable, label editing, removal, and Preferred/Automatic controls. Native failover automatically routes rate-limited native requests (`429`) across all reasoning efforts in the same model family while keeping failover-only pools hidden from the chat selector. [Account controls](docs/configuration.md#quota-panel-and-preferred-accounts). |
+| **Estimate visible chat context** | A read-only ring beside a recognized native model selector marks transcript estimates with `~` and unavailable usage with `?`. Hidden prompts, tool definitions and images are excluded. [Scope and limits](docs/configuration.md#native-context-estimate). |
 | **Inspect direct requests** | Diagnostics with recent requests, measured latency/token usage, and an explicit small generation test. |
-| **Connect Antigravity IDE** | Reversible settings adapter, owned proxy launcher and browser model manager; native picker and streamed chat verified on Windows IDE 2.5.5 with a local OpenAI-compatible provider. [Setup](docs/ide.md). |
+| **Connect Antigravity IDE** | Reversible settings adapter, owned proxy launcher and browser model manager. [Setup](docs/ide.md). |
 | **Keep native model selections stable** | Persistent collision-free IDs for model aliases and effort variants, with explicit [native picker capacity](docs/ide.md#native-model-identities-and-capacity). |
 | **Share configuration** | Validated JSON/base64 import and exports that omit stored credentials. |
 | **Add a web dashboard** | Optional gateway with provider routing, request/session history, replay, charts, and cost estimates. |
@@ -65,6 +84,39 @@ Add external API providers and local models alongside Antigravity's built-in mod
 The installer preserves the installed application's runtime and adds validated hooks. It keeps version-specific backups and rolls back failed deployments. See the [feature comparison](docs/feature-parity.md) for implementation details and scope.
 
 ## Screenshots
+
+### Generative UI & CSP Relaxation Showcase
+
+With [`src/cspPreload.ts`](src/cspPreload.ts) active, Antigravity's `<agent-embed>` iframes can load external scientific, graphing, and 3D WebGL libraries from public CDNs (**Three.js**, **Plotly.js**, **JSXGraph**, **D3.js**, **Mermaid**, **Chart.js + jStat**, and **KaTeX**) while preserving host sandbox isolation:
+
+<p align="center">
+  <a href="assets/showcase_distributions_dark.png">
+    <img src="assets/showcase_distributions_dark.png" width="1000" alt="Chart.js + jStat interactive Gaussian mixture distributions rendered inline inside Antigravity chat">
+  </a>
+  <br>
+  <em><strong>Interactive Statistical Dashboards (Chart.js + jStat)</strong> — Zero-flicker in-place dataset mutation driven by a live <code>sigma</code> slider directly inside the chat stream.</em>
+</p>
+
+| **D3.js Force-Directed Graph (Dark Mode)** | **Three.js 3D WebGL Manifold (Light Mode)** |
+| :---: | :---: |
+| <a href="assets/showcase_d3_graph_dark.png"><img src="assets/showcase_d3_graph_dark.png" width="490" alt="D3.js force simulation with draggable nodes rendered inline in Antigravity"></a> | <a href="assets/showcase_threejs_light.png"><img src="assets/showcase_threejs_light.png" width="490" alt="Three.js WebGL torus knot manifold and 900-particle swarm in light theme"></a> |
+| *Interactive physics force layout with draggable nodes (`d3@7`).* | *Real-time WebGL torus-knot manifold + 900-particle swarm (`three@0.160.0`) with live theme switching.* |
+
+> [!TIP]
+> **Recommended for Maximum Efficacy (Optional):** While [`src/cspPreload.ts`](src/cspPreload.ts) unlocks external CDNs and iframe script execution at the runtime level on its own, Antigravity's built-in system prompt still defaults to conservative static SVG/ASCII fallbacks unless guided otherwise.
+>
+> For the best out-of-the-box results, install the bundled [`skills/generative_ui`](skills/generative_ui/SKILL.md) skill (which provides the CDN routing matrix, zero-flicker `requestAnimationFrame` update patterns, `<430px` non-scrollable card sizing, and headless snapshot helpers). It is completely **optional**—you can use it as-is, customize it, or write your own skill:
+> ```sh
+> # Install globally for all workspaces (recommended):
+> mkdir -p ~/.gemini/config/skills
+> cp -R skills/generative_ui ~/.gemini/config/skills/generative_ui
+>
+> # Or install per-workspace:
+> mkdir -p .agents/skills
+> cp -R skills/generative_ui .agents/skills/generative_ui
+> ```
+
+---
 
 ### Model management
 
@@ -120,7 +172,7 @@ Map model aliases to providers and configure fallback models and context limits 
 You need the **standalone Antigravity desktop app**, Git, and **Node.js 22.13 or newer**. This Node version covers both the desktop addon and the optional gateway.
 
 ```sh
-git clone https://github.com/vahapogut/antigravity-add-model.git
+git clone https://github.com/prof-slop/antigravity-add-model.git
 cd antigravity-add-model
 npm ci --ignore-scripts
 npm run build
@@ -128,8 +180,7 @@ npm run build
 
 Already have the repository? Update your checkout, then run the dependency and build commands again.
 
-Using **Antigravity IDE**? Continue with [IDE setup](docs/ide.md) instead of the
-standalone installer below. Its basic flow is:
+Using **Antigravity IDE**? Continue with [IDE setup](docs/ide.md) instead of the standalone installer below. Its basic flow is:
 
 ```sh
 npm run ide:check -- --resources "/path/to/Antigravity IDE/resources"
@@ -147,7 +198,7 @@ node scripts/deploy.mjs --check
 node scripts/deploy.mjs
 ```
 
-The first command checks compatibility without changing the installation. The second applies the addon. Reopen Antigravity after a successful deployment.
+The first command checks compatibility without changing the installation. The second applies the addon (and re-signs the app bundle on macOS). Reopen Antigravity after a successful deployment.
 
 If automatic detection cannot find your app, use the same explicit path for both commands:
 
@@ -194,10 +245,7 @@ This option requires port **50999** and participates in backup/rollback. It is s
 
 **Running models locally?** Start your local server first, then choose **Discover local**. Discovery checks common ports only when requested.
 
-**Using Cloudflare Workers AI?** Run `npm run workers-ai:setup -- wizard` for
-guided account selection, scoped-token creation or an existing token, and model
-selection. The optional helper encrypts saved credentials and can rotate entries
-for one account. See [setup, permissions and verification limits](docs/workers-ai-setup.md).
+**Using Cloudflare Workers AI?** Run `npm run workers-ai:setup -- wizard` for guided account selection, scoped-token creation or an existing token, and model selection. The optional helper encrypts saved credentials and can rotate entries for one account. See [setup, permissions and verification limits](docs/workers-ai-setup.md).
 
 **Moving settings between machines?** Use **Export** and **Import**. Exported configurations omit API keys, custom headers, and Google tokens/client secrets; enter credentials on the receiving machine.
 
@@ -215,7 +263,7 @@ for one account. See [setup, permissions and verification limits](docs/workers-a
 
 Presets fill in defaults; **API format** determines how requests are translated. Model IDs and access depend on the provider. The [provider catalog](src/providers.ts) is the full list.
 
-**Want hundreds of model choices?** OpenRouter and other multi-model services supply live catalogs through **Fetch provider models**. Search and select the models you need; the addon imports available context/output limits and image/reasoning metadata while preserving your explicit overrides. Catalogs change over time, and a listed model still needs account access and the capabilities your task requires. See [provider setup and model discovery](docs/providers.md).
+**Want hundreds of model choices?** OpenRouter and other multi-model services supply live catalogs through **Fetch provider models**. Search and select the models you need; the addon imports available context/output limits and image/reasoning metadata while preserving your explicit overrides. See [provider setup and model discovery](docs/providers.md).
 
 **Using a vision model?** The desktop proxy forwards image inputs to OpenAI-compatible and Anthropic-compatible endpoints, including compatible DeepSeek vision models. See [image input setup](docs/configuration.md#image-inputs) for capability overrides, supported formats and endpoint requirements.
 
@@ -225,7 +273,13 @@ Open **Advanced settings** for request limits, reasoning, headers, fallback mode
 
 **Compaction threshold (%)** lets you tune the native IDE's checkpoint threshold while reserving space for model output. Leave it blank to keep the IDE default; see the [85k context example](docs/configuration.md#compaction-threshold).
 
-For Google account pooling, choose **Google Cloud Code account pool** and follow the [account setup guide](docs/configuration.md#google-cloud-code-account-pools). Sign in with **Antigravity account** using a recognized IDE **2.5.5** installation, or select **My Desktop OAuth client** to use your own client. Account and service eligibility remain provider-controlled.
+### Google Cloud Code Fleet & Native Failover
+
+For multi-account Google quota pooling, choose **Google Cloud Code account pool** and follow the [account setup guide](docs/configuration.md#google-cloud-code-account-pools):
+- Sign in with **Antigravity account** (credentials are verified at runtime from your installed `language_server` binary) or **My Desktop OAuth client**.
+- When **Native Failover** (`nativeFailoverEnabled`) is enabled on a pool (for example, `gemini-4-argon` or `gemini-3.8-flash`), you continue selecting the standard built-in model in the chat dropdown.
+- If your primary IDE account exhausts its quota (`429`), the proxy transparently reroutes the request through your secondary pool account—matching **any reasoning effort** (`low`, `medium`, `high`, `tiered`) in that model family.
+- Failover-enabled Fleet pools are hidden from the chat model picker so you never see duplicate Fleet entries in your selector.
 
 ## Optional gateway and web dashboard
 
@@ -277,15 +331,38 @@ Keep the tunnel open and use the local URLs from the table above. Both gateway l
 
 ```mermaid
 flowchart LR
-    Desktop["Antigravity desktop"] --> Proxy["Local model proxy"]
+    Desktop["Antigravity desktop + cspPreload"] --> Proxy["Local model proxy (SSE keepalive)"]
     Proxy --> Builtin["Built-in Google models"]
+    Builtin -. "429 family-wide failover" .-> Fleet["Google Account Fleet pool"]
     Proxy --> Providers["External APIs / local models"]
     Proxy --> Gateway["Optional gateway"]
     Gateway --> Providers
     Dashboard["Web dashboard + history"] --- Gateway
 ```
 
-The addon appends its Settings controls and preserves the installed vendor runtime. The gateway runs as a separate Node process and uses its own data directory.
+The addon injects `customPreload` and `cspPreload` alongside the vendor runtime while preserving all native functionality. The gateway runs as a separate Node process and uses its own data directory.
+
+## Syncing with upstream
+
+This fork tracks [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) as `upstream` while maintaining custom enhancements on `main`. To pull in new upstream releases without losing fork features:
+
+```sh
+# 1. Add upstream remote once (if not already present)
+git remote add upstream https://github.com/vahapogut/antigravity-add-model.git
+
+# 2. Fetch and rebase our fork commits on top of upstream/main
+git fetch upstream
+git rebase upstream/main
+
+# 3. Rebuild dist/, run the test suite, and re-deploy
+npm run build && npm test && node scripts/deploy.mjs
+
+# 4. Push updated branch to origin
+git push --force-with-lease origin main
+```
+
+> [!TIP]
+> Because `dist/` is tracked in git, if a rebase ever reports conflicts inside `dist/*`, only resolve conflicts in `src/` and run `npm run build` to cleanly regenerate `dist/`.
 
 ## Updates, diagnostics, and recovery
 
@@ -308,7 +385,7 @@ Close the app before repair or restore. Use the Windows endpoint option when app
 | Installer reports `NOT_SUPPORTED` or `UNSUPPORTED_RUNTIME` | Confirm you have the standalone app and check the [supported layouts](docs/compatibility.md). |
 | Black screen after an app update | Follow [startup recovery](docs/compatibility.md#black-screen-after-an-update); avoid restoring an arbitrary older archive. |
 | Windows installer keeps asking to close Antigravity | Follow [update preparation](docs/compatibility.md#windows-installer-asks-to-close-antigravity); collect the exact installer error if it persists. |
-| A model is missing | Check that it is enabled, saved, and using the correct provider model ID. |
+| A model is missing | Check that it is enabled, saved, and using the correct provider model ID (note: Google Fleet pools with **Native Failover** enabled are intentionally hidden from the chat dropdown). |
 | Provider returns 401, 403, or 404 | Check credentials, account access/location, API URL, and model availability. |
 | Port 50999 is occupied | A binary-patched Windows install needs that fixed port; ordinary unpatched operation can choose another port. |
 | TLS connection fails | Check the endpoint certificate and your trusted CA configuration. |
@@ -321,6 +398,7 @@ More details: [compatibility and recovery](docs/compatibility.md) · [model conf
 | --- | --- |
 | Desktop addon | Models live in `~/.gemini/antigravity/custom_models.json`. Saved API keys, headers, gateway tokens, and Google credentials are encrypted and masked in the editor. |
 | Encryption fallback | When OS-backed storage is unavailable, local AES-256-GCM uses `~/.gemini/antigravity/.model-credentials-key`. Keep that key with private backups. |
+| Vendor OAuth extraction | Personal Google OAuth credentials are never stored in source code; they are recovered in-memory from the local `language_server` binary using a 64-bit SHA-256 pair fingerprint. |
 | Model exports | Stored API keys, custom headers, and Google tokens/client secrets are omitted. Ordinary configuration fields are retained. |
 | Optional gateway | Uses its own `~/.gemini/antigravity/gateway` profile. Its credential configuration is separate from Electron storage; history contains request and response content. |
 
@@ -361,7 +439,7 @@ npm run test:integration
 
 CI runs on Windows, macOS, and Linux using local provider fixtures and isolated installation packages. It does not validate live provider credentials or every future Antigravity release.
 
-For a new provider, start with [the desktop preset catalog](src/providers.ts), [protocol registry](src/proxy/registry.ts), and [gateway provider catalog](gateway/src/provider-catalog.ts). Changes should include relevant tests and rebuilt desktop output. Pull requests are welcome; [open an issue](https://github.com/vahapogut/antigravity-add-model/issues) for reproducible bugs, with your app type/version, OS, and diagnostics.
+For a new provider, start with [the desktop preset catalog](src/providers.ts), [protocol registry](src/proxy/registry.ts), and [gateway provider catalog](gateway/src/provider-catalog.ts). Changes should include relevant tests and rebuilt desktop output.
 
 ## License and credits
 
@@ -369,6 +447,6 @@ For a new provider, start with [the desktop preset catalog](src/providers.ts), [
 
 Antigravity logo from [Google's official press assets](https://antigravity.google/press).
 
-Maintained by **[vahapogut](https://github.com/vahapogut)** · [LinkedIn](https://www.linkedin.com/in/abdulvahap-ogut-343992398/)
+Fork maintained by **[prof-slop](https://github.com/prof-slop/antigravity-add-model)** · Upstream project by **[vahapogut](https://github.com/vahapogut/antigravity-add-model)**
 
 <p align="center"><a href="#quick-links">↑ Back to quick links</a></p>

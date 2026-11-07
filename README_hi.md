@@ -2,15 +2,15 @@
   <img src="gateway/dashboard/antigravity-logo.png" width="96" height="96" alt="Google Antigravity का लोगो">
 </p>
 
-<h1 align="center">Antigravity Custom Model Enabler</h1>
+<h1 align="center">Antigravity Custom Model Enabler — संवर्धित फ़ोर्क (Enhanced Fork)</h1>
 
 <p align="center">
-  <strong>आपके प्रदाता। आपके स्थानीय मॉडल। Antigravity के अंदर।</strong><br>
-  डेस्कटॉप ऐप, Antigravity IDE और वैकल्पिक गेटवे के लिए मॉडल प्रबंधन।
+  <strong>आपके प्रदाता। आपके स्थानीय मॉडल। इंटरैक्टिव Generative UI। बिना भीड़-भाड़ वाला फ़्लीट फ़ेलओवर।</strong><br>
+  डेस्कटॉप ऐप, Antigravity IDE और वैकल्पिक गेटवे के लिए उन्नत मॉडल रूटिंग, बहु-खाता कोटा फ़ेलओवर और इंटरैक्टिव विज़ुअल रेंडरिंग।
 </p>
 
 <p align="center">
-  <a href="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/vahapogut/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml"><img src="https://github.com/prof-slop/antigravity-add-model/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="#installation"><img src="https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=nodedotjs&logoColor=white" alt="Node.js 22.13 या नया संस्करण"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-2563eb" alt="Apache License 2.0"></a>
 </p>
@@ -20,16 +20,32 @@
 </p>
 
 <p align="center">
-  <a href="#installation"><strong>जल्दी शुरू करें</strong></a> ·
+  <a href="#whats-new-in-this-fork"><strong>इस फ़ोर्क में नया क्या है</strong></a> ·
+  <a href="#installation">जल्दी शुरू करें</a> ·
   <a href="#quick-links">ज़रूरी लिंक</a> ·
   <a href="#screenshots">स्क्रीनशॉट</a> ·
-  <a href="#documentation">दस्तावेज़</a> ·
-  <a href="https://github.com/vahapogut/antigravity-add-model/issues/new">समस्या की सूचना दें</a>
+  <a href="#syncing-with-upstream">अपस्ट्रीम के साथ सिंक करें</a> ·
+  <a href="https://github.com/prof-slop/antigravity-add-model/issues/new">समस्या की सूचना दें</a>
 </p>
 
 ---
 
-Antigravity के अंतर्निहित मॉडलों के साथ बाहरी API प्रदाता और स्थानीय मॉडल जोड़ें। उन्हें Settings में कॉन्फ़िगर करें, चैट के मॉडल चयन मेन्यू से मॉडल बदलें और चाहें तो अनुरोधों को ऐसे गेटवे से भेजें जिसमें इतिहास, फ़ॉलबैक प्रदाता और ब्राउज़र डैशबोर्ड हो।
+Antigravity के अंतर्निहित मॉडलों के साथ बाहरी API प्रदाता, स्थानीय मॉडल और बहु-खाता Google Cloud Code कोटा पूल जोड़ें। चैट में इंटरैक्टिव HTML/WebGL विजेट रेंडर करें और वैकल्पिक गेटवे का उपयोग करें।
+
+<a id="whats-new-in-this-fork"></a>
+
+## इस फ़ोर्क में नया क्या है
+
+यह रिपॉज़िटरी (`prof-slop/antigravity-add-model`) [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) पर आधारित है और इसमें ये प्रमुख सुधार शामिल हैं:
+
+| सुधार | विवरण |
+| --- | --- |
+| **Generative UI और CSP सैंडबॉक्स अनलॉक (`cspPreload` + [`skills/generative_ui`](skills/generative_ui/SKILL.md))** | Content Security Policy को लचीला बनाता है और HTML आर्टिफ़ैक्ट्स के लिए `<iframe>` सैंडबॉक्स (`allow-scripts allow-forms allow-downloads allow-modals`) को अपग्रेड करता है। चैट के अंदर सीधे 3D WebGL (`Three.js`), गणितीय ग्राफ़ (`JSXGraph`, `Plotly.js`), `KaTeX`, `D3`, और `Chart.js + jStat` चलाने की सुविधा देता है। सर्वोत्तम परिणामों के लिए वैकल्पिक [`generative_ui` स्किल](skills/generative_ui/SKILL.md) शामिल है। |
+| **संपूर्ण मॉडल परिवार के लिए Google फ़्लीट फ़ेलओवर** | **Native Failover** वाला एक ही `google-cloudcode` पूल प्राथमिक खाते का कोटा (`429`) समाप्त होने पर उसी मॉडल परिवार के **सभी रीजनिंग स्तरों** (`low`, `medium`, `high`, `xhigh`, `tiered`, `thinking`) को स्वतः कवर करता है। |
+| **साफ़ मॉडल चयन मेन्यू** | केवल बैकग्राउंड **Native Failover** के लिए बने Google फ़्लीट पूल चैट मॉडल ड्रॉपडाउन से स्वतः छिपे रहते हैं। |
+| **SSE Keepalive और लंबी स्ट्रीमिंग स्थिरता** | बड़े टूल-कॉल आर्ग्युमेंट (जैसे 40 KB `write_file`) बफ़र करते समय हर 5 सेकंड में `: keepalive` हार्टबीट भेजता है और स्ट्रीमिंग टाइमआउट को 15 मिनट तक बढ़ाता है। |
+| **मल्टी-टर्न रीजनिंग और सब-एजेंट संरक्षण** | OpenAI टूल-कॉल राउंड ट्रिप और `invoke_subagent` रूटिंग में `reasoning_content` / `<thinking>` को सुरक्षित रखता है। |
+| **बिना हार्डकोडेड सीक्रेट के सुरक्षित OAuth निष्कर्षण** | सोर्स कोड या `dist/` में कोई `GOCSPX-` सीक्रेट नहीं; रनटाइम पर `language_server` बाइनरी से 64-बिट SHA-256 फ़िंगरप्रिंट (`6f5c1920f8566f36`) द्वारा सत्यापन करता है। |
 
 > [!IMPORTANT]
 > **अलग Electron डेस्कटॉप एजेंट** नीचे दिए गए ऐड-ऑन इंस्टॉलर का उपयोग करता है। अलग **VS Code पर आधारित Antigravity IDE** के लिए अपना [सेटिंग्स अडैप्टर और स्थानीय वेब मैनेजर](docs/ide.md) है। Windows IDE **2.5.5** में साइन-इन, मूल मॉडल चयन और स्ट्रीमिंग चैट को स्थानीय OpenAI-संगत प्रदाता के साथ सत्यापित किया गया है; [सत्यापन परिणाम](docs/ide.md#validation-boundary) देखें। कस्टम मॉडल रूटिंग स्थानीय सत्रों पर लागू होती है; विक्रेता की WSL रूटिंग सुरक्षित रहती है। इंस्टॉल करने से पहले [संगतता](docs/compatibility.md) जाँचें।
@@ -74,6 +90,31 @@ Antigravity के अंतर्निहित मॉडलों के स�
 <a id="screenshots"></a>
 
 ## स्क्रीनशॉट
+
+### Generative UI और CSP छूट का प्रदर्शन
+
+[`src/cspPreload.ts`](src/cspPreload.ts) सक्रिय होने पर, Antigravity के `<agent-embed>` फ़्रेम होस्ट सैंडबॉक्स सुरक्षा बनाए रखते हुए सार्वजनिक CDN (**Three.js**, **Plotly.js**, **JSXGraph**, **D3.js**, **Mermaid**, **Chart.js + jStat**, और **KaTeX**) से इंटरैक्टिव ग्राफ़ और 3D WebGL रेंडर करते हैं:
+
+<p align="center">
+  <a href="assets/showcase_distributions_dark.png">
+    <img src="assets/showcase_distributions_dark.png" width="1000" alt="Antigravity चैट के अंदर Chart.js + jStat इंटरैक्टिव गॉसियन वितरण">
+  </a>
+  <br>
+  <em><strong>इंटरैक्टिव सांख्यिकीय डैशबोर्ड (Chart.js + jStat)</strong> — लाइव <code>sigma</code> स्लाइडर के साथ चैट स्ट्रीम में बिना झिलमिलाहट डेटासेट अपडेट।</em>
+</p>
+
+| **D3.js फ़ोर्स-डायरेक्टेड ग्राफ़ (डार्क मोड)** | **Three.js 3D WebGL मैनिफ़ोल्ड (लाइट मोड)** |
+| :---: | :---: |
+| <a href="assets/showcase_d3_graph_dark.png"><img src="assets/showcase_d3_graph_dark.png" width="490" alt="ड्रैग किए जा सकने वाले नोड्स के साथ D3.js फ़ोर्स सिमुलेशन"></a> | <a href="assets/showcase_threejs_light.png"><img src="assets/showcase_threejs_light.png" width="490" alt="लाइट थीम में Three.js WebGL टोरस-नॉट मैनिफ़ोल्ड और 900 कण"></a> |
+| *ड्रैग किए जा सकने वाले नोड्स के साथ इंटरैक्टिव फ़ोर्स लेआउट (`d3@7`)।* | *रीयल-टाइम WebGL टोरस-नॉट मैनिफ़ोल्ड + 900 कण (`three@0.160.0`) और लाइव थीम स्विचिंग।* |
+
+> [!TIP]
+> **अधिकतम प्रभावशीलता के लिए अनुशंसित (वैकल्पिक):** हालाँकि [`src/cspPreload.ts`](src/cspPreload.ts) रनटाइम स्तर पर बाहरी CDN को अनलॉक करता है, सर्वोत्तम परिणामों के लिए प्रोजेक्ट में शामिल [`skills/generative_ui`](skills/generative_ui/SKILL.md) स्किल को इंस्टॉल करने की सलाह दी जाती है (यह पूरी तरह **वैकल्पिक** है — आप इसे ऐसे ही उपयोग कर सकते हैं या अपनी स्वयं की स्किल बना सकते हैं):
+> ```sh
+> mkdir -p ~/.gemini/config/skills && cp -R skills/generative_ui ~/.gemini/config/skills/generative_ui
+> ```
+
+---
 
 <a id="model-management"></a>
 
@@ -141,7 +182,7 @@ Antigravity के अंतर्निहित मॉडलों के स�
 आपको **अलग Antigravity डेस्कटॉप ऐप**, Git और **Node.js 22.13 या नया संस्करण** चाहिए। Node का यह संस्करण डेस्कटॉप ऐड-ऑन और वैकल्पिक गेटवे दोनों के लिए उपयुक्त है।
 
 ```sh
-git clone https://github.com/vahapogut/antigravity-add-model.git
+git clone https://github.com/prof-slop/antigravity-add-model.git
 cd antigravity-add-model
 npm ci --ignore-scripts
 npm run build
@@ -312,6 +353,19 @@ flowchart LR
 
 ऐड-ऑन अपने Settings नियंत्रण जोड़ता है और इंस्टॉल किए गए विक्रेता रनटाइम को सुरक्षित रखता है। गेटवे एक अलग Node प्रक्रिया के रूप में चलता है और अपनी डेटा डायरेक्टरी उपयोग करता है।
 
+<a id="syncing-with-upstream"></a>
+
+## अपस्ट्रीम के साथ सिंक करें
+
+यह फ़ोर्क [`vahapogut/antigravity-add-model`](https://github.com/vahapogut/antigravity-add-model) को `upstream` के रूप में ट्रैक करता है:
+
+```sh
+git remote add upstream https://github.com/vahapogut/antigravity-add-model.git
+git fetch upstream && git rebase upstream/main
+npm run build && npm test && node scripts/deploy.mjs
+git push --force-with-lease origin main
+```
+
 <a id="updates-diagnostics-and-recovery"></a>
 
 ## अपडेट, डायग्नोस्टिक्स और रिकवरी
@@ -403,6 +457,6 @@ CI स्थानीय प्रदाता फ़िक्स्चर औ�
 
 Antigravity का लोगो [Google की आधिकारिक प्रेस सामग्री](https://antigravity.google/press) से लिया गया है।
 
-रखरखाव: **[vahapogut](https://github.com/vahapogut)** · [LinkedIn](https://www.linkedin.com/in/abdulvahap-ogut-343992398/)
+फ़ोर्क रखरखाव: **[prof-slop](https://github.com/prof-slop/antigravity-add-model)** · मूल प्रोजेक्ट: **[vahapogut](https://github.com/vahapogut/antigravity-add-model)**
 
 <p align="center"><a href="#quick-links">↑ ज़रूरी लिंक पर वापस जाएँ</a></p>
